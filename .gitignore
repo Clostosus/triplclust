@@ -27,6 +27,7 @@ CMakeFiles/
 CMakeCache.txt
 *.ninja*
 *.cmake
+anRpackage/
 
 
 # Compiled Static libraries

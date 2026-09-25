@@ -1,0 +1,7 @@
+Package: triplclust
+Version: 1.0.0
+Title: R Interface to TriplClust
+Depends: R (>= 3.5.0)
+LinkingTo: Rcpp
+Imports: Rcpp
+License: GPL-3
