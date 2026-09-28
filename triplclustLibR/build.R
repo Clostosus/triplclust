@@ -2,7 +2,7 @@
 # -------------------------------------------------------------
 #  build.R – invoked from ./build.sh
 #  • Generates RcppExports.* files
-#  • Installs the R package
+#  • Installs the R package if wanted
 # -------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -12,6 +12,7 @@ if (length(args) == 0) {
 } else {
   pkg_dir <- args[1]
 }
+install <- "--install" %in% args
 
 if (!file.exists(pkg_dir)) {
   stop("Package directory does not exist: ", pkg_dir)
@@ -32,7 +33,21 @@ Rcpp::compileAttributes()
 
 #  Build the package
 dir.create("../build/rpackage", recursive = TRUE, showWarnings = FALSE)
-pkgbuild::build(
+package_file <- pkgbuild::build(
   path = ".",
   dest_path = "../build/rpackage/triplclust.R"
 )
+message("=== R package built ===")
+message(package_file)
+
+if (install) {
+  message("=== Installing R package ===")
+
+  install.packages(
+    package_file,
+    repos = NULL,
+    type = "source"
+  )
+
+  message("=== R package installed: ", package_file, " ===")
+}
