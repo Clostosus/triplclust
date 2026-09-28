@@ -1,356 +1,247 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# -------------------------------------------------------------
+#  verify.sh - compares the C++ binary with the R package.
+#
+#  Usage:
+#    ./triplclustLibR/verify.sh              # all *.dat files in data/
+#    ./triplclustLibR/verify.sh a.dat b.dat  # only the given files
+#
+#  Environment:
+#    DATA_DIR  directory with test data   (default: <project>/data)
+#    RUNS      timing runs per file       (default: 1)
+#    MAX_SHOW  max. differences printed   (default: 10)
+#
+#  Files that do not have exactly three columns are skipped, because
+#  use_triplclust.R only supports x y z input.
+# -------------------------------------------------------------
+set -uo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 R_PACKAGE_ROOT="${PROJECT_ROOT}/triplclustLibR"
 
-INPUT="${1:-${PROJECT_ROOT}/test.dat}"
-RUNS="${RUNS:-5}"
+DATA_DIR="${DATA_DIR:-${PROJECT_ROOT}/data}"
+RUNS="${RUNS:-1}"
+MAX_SHOW="${MAX_SHOW:-10}"
 
 CPP_BINARY="${PROJECT_ROOT}/build/triplclust"
 R_SCRIPT="${R_PACKAGE_ROOT}/tests/use_triplclust.R"
 
 TMP_DIR="$(mktemp -d)"
 
-CPP_OUT="${TMP_DIR}/cpp.csv"
-R_OUT="${TMP_DIR}/r.csv"
-
-echo "Temporary files:"
-echo "  C++: ${CPP_OUT}"
-echo "  R:   ${R_OUT}"
-
-###############################################################################
+# ---------------------------------------------------------------
 # Checks
-###############################################################################
-
+# ---------------------------------------------------------------
 if [[ ! -x "${CPP_BINARY}" ]]; then
-    echo "ERROR: C++ binary not found or not executable:"
-    echo "  ${CPP_BINARY}"
+    echo "ERROR: C++ binary not found or not executable: ${CPP_BINARY}"
     exit 1
 fi
-
 if [[ ! -x "${R_SCRIPT}" ]]; then
-    echo "ERROR: R script not found or not executable:"
-    echo "  ${R_SCRIPT}"
+    echo "ERROR: R script not found or not executable: ${R_SCRIPT}"
     exit 1
 fi
-
-if [[ ! -f "${INPUT}" ]]; then
-    echo "ERROR: Input file not found:"
-    echo "  ${INPUT}"
-    exit 1
-fi
-
 if ! [[ "${RUNS}" =~ ^[1-9][0-9]*$ ]]; then
     echo "ERROR: RUNS must be a positive integer"
     exit 1
 fi
 
-###############################################################################
-# Timing
-###############################################################################
+# ---------------------------------------------------------------
+# Collect input files
+# ---------------------------------------------------------------
+FILES=("$@")
+if (( ${#FILES[@]} == 0 )); then
+    shopt -s nullglob
+    FILES=("${DATA_DIR}"/*.dat)
+    shopt -u nullglob
+fi
+if (( ${#FILES[@]} == 0 )); then
+    echo "ERROR: no input files found in ${DATA_DIR}"
+    exit 1
+fi
 
-measure_cpp() {
-    local output="$1"
-    local start
-    local end
+# ---------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------
 
+# Runs a command, stdout -> $1, stderr -> $1.err.
+# Sets ELAPSED_MS and returns the exit code of the command.
+ELAPSED_MS=0
+time_cmd() {
+    local out="$1"; shift
+    local start end rc
     start=$(date +%s%N)
-
-    "${CPP_BINARY}" "${INPUT}" > "${output}"
-
+    "$@" > "${out}" 2> "${out}.err"
+    rc=$?
     end=$(date +%s%N)
-
-    echo $(( (end - start) / 1000000 ))
+    ELAPSED_MS=$(( (end - start) / 1000000 ))
+    return "${rc}"
 }
 
-measure_r() {
-    local output="$1"
-    local start
-    local end
-
-    start=$(date +%s%N)
-
-    "${R_SCRIPT}" "${INPUT}" > "${output}"
-
-    end=$(date +%s%N)
-
-    echo $(( (end - start) / 1000000 ))
+# Number of columns of the first data line (comments/empty lines ignored)
+count_columns() {
+    awk '!/^[[:space:]]*(#|$)/ { print NF; exit }' "$1"
 }
 
-###############################################################################
-# First run — also used for correctness
-###############################################################################
+# Removes comment and empty lines
+strip_comments() {
+    grep -v -e '^#' -e '^$' "$1" > "$2" || true
+}
 
-echo
-echo "=== Running C++ binary ==="
+# ---------------------------------------------------------------
+# Compare one file. Sets RESULT (OK|FAIL|ERROR|SKIP) and DETAIL.
+# ---------------------------------------------------------------
+RESULT=""
+DETAIL=""
+CPP_MS=0
+R_MS=0
 
-CPP_TIME_MS="$(measure_cpp "${CPP_OUT}")"
+verify_file() {
+    local input="$1"
+    local name; name="$(basename "${input}")"
+    local cpp_out="${TMP_DIR}/${name}.cpp.csv"
+    local r_out="${TMP_DIR}/${name}.r.csv"
 
-echo "C++ runtime: ${CPP_TIME_MS} ms"
+    RESULT=""; DETAIL=""; CPP_MS=0; R_MS=0
 
-echo
-echo "=== Running R implementation ==="
-
-R_TIME_MS="$(measure_r "${R_OUT}")"
-
-echo "R runtime:   ${R_TIME_MS} ms"
-
-###############################################################################
-# Parse and compare rows
-###############################################################################
-
-echo
-echo "=== Comparing output ==="
-
-divergence_line=0
-data_differences=0
-label_differences=0
-multilabel_differences=0
-
-cpp_rows=0
-r_rows=0
-
-###############################################################################
-# Read both files into arrays.
-#
-# Comments are ignored.
-###############################################################################
-
-declare -a CPP_LINES
-declare -a R_LINES
-
-while IFS= read -r line || [[ -n "${line}" ]]; do
-    [[ "${line}" == \#* ]] && continue
-    [[ -z "${line}" ]] && continue
-
-    CPP_LINES+=("${line}")
-done < "${CPP_OUT}"
-
-while IFS= read -r line || [[ -n "${line}" ]]; do
-    [[ "${line}" == \#* ]] && continue
-    [[ -z "${line}" ]] && continue
-
-    R_LINES+=("${line}")
-done < "${R_OUT}"
-
-cpp_rows="${#CPP_LINES[@]}"
-r_rows="${#R_LINES[@]}"
-
-max_rows=$(( cpp_rows > r_rows ? cpp_rows : r_rows ))
-
-###############################################################################
-# Compare rows
-###############################################################################
-
-for ((i = 0; i < max_rows; i++)); do
-
-    line_no=$((i + 1))
-
-    cpp_line="${CPP_LINES[$i]:-}"
-    r_line="${R_LINES[$i]:-}"
-
-    if [[ -z "${cpp_line}" ]]; then
-        if (( divergence_line == 0 )); then
-            divergence_line="${line_no}"
-        fi
-
-        echo
-        echo "Line ${line_no}: C++ has no row, R has:"
-        echo "  R: ${r_line}"
-
-        data_differences=$((data_differences + 1))
-        continue
+    if [[ ! -f "${input}" ]]; then
+        RESULT="ERROR"; DETAIL="file not found"
+        return
     fi
 
-    if [[ -z "${r_line}" ]]; then
-        if (( divergence_line == 0 )); then
-            divergence_line="${line_no}"
-        fi
-
-        echo
-        echo "Line ${line_no}: R has no row, C++ has:"
-        echo "  C++: ${cpp_line}"
-
-        data_differences=$((data_differences + 1))
-        continue
+    local cols; cols="$(count_columns "${input}")"
+    if [[ "${cols}" != "3" ]]; then
+        RESULT="SKIP"; DETAIL="${cols:-0} columns (need 3)"
+        return
     fi
 
-    IFS=',' read -r cpp_x cpp_y cpp_z cpp_labels <<< "${cpp_line}"
-    IFS=',' read -r r_x r_y r_z r_labels <<< "${r_line}"
+    # --- run both implementations ---
+    if ! time_cmd "${cpp_out}" "${CPP_BINARY}" "${input}"; then
+        RESULT="ERROR"; DETAIL="C++ failed: $(head -n 1 "${cpp_out}.err")"
+        return
+    fi
+    CPP_MS="${ELAPSED_MS}"
 
-    cpp_data="${cpp_x},${cpp_y},${cpp_z}"
-    r_data="${r_x},${r_y},${r_z}"
+    if ! time_cmd "${r_out}" "${R_SCRIPT}" "${input}"; then
+        RESULT="ERROR"; DETAIL="R failed: $(grep -v '^$' "${r_out}.err" | tail -n 1)"
+        return
+    fi
+    R_MS="${ELAPSED_MS}"
 
-    # Compare the first three columns.
-    if [[ "${cpp_data}" != "${r_data}" ]]; then
-
-        if (( divergence_line == 0 )); then
-            divergence_line="${line_no}"
-        fi
-
-        data_differences=$((data_differences + 1))
-
-        echo
-        echo "Line ${line_no}: DATA DIFFERENCE"
-        echo "  C++: ${cpp_line}"
-        echo "  R:   ${r_line}"
-
-        continue
+    # --- optional additional timing runs ---
+    if (( RUNS > 1 )); then
+        local cpp_total="${CPP_MS}" r_total="${R_MS}" i
+        for ((i = 2; i <= RUNS; i++)); do
+            time_cmd "${TMP_DIR}/t.cpp" "${CPP_BINARY}" "${input}"; cpp_total=$((cpp_total + ELAPSED_MS))
+            time_cmd "${TMP_DIR}/t.r" "${R_SCRIPT}" "${input}";     r_total=$((r_total + ELAPSED_MS))
+        done
+        CPP_MS=$((cpp_total / RUNS))
+        R_MS=$((r_total / RUNS))
     fi
 
-    # Same coordinates/data, compare labels.
-    if [[ "${cpp_labels}" != "${r_labels}" ]]; then
+    # --- compare (comments ignored) ---
+    strip_comments "${cpp_out}" "${cpp_out}.cmp"
+    strip_comments "${r_out}"   "${r_out}.cmp"
 
-        if (( divergence_line == 0 )); then
-            divergence_line="${line_no}"
-        fi
+    local report="${TMP_DIR}/${name}.report"
+    awk -F, -v limit="${MAX_SHOW}" '
+        FILENAME == ARGV[1] { a[FNR] = $0; na = FNR; next }
+        { b[FNR] = $0; nb = FNR }
+        END {
+            n = (na > nb) ? na : nb
+            for (i = 1; i <= n; i++) {
+                if (!(i in a) || !(i in b)) {
+                    dd++; if (!first) first = i
+                    if (shown++ < limit) printf "    line %d: row missing on one side\n", i
+                    continue
+                }
+                split(a[i], x, ","); split(b[i], y, ",")
+                kx = x[1] "," x[2] "," x[3]
+                ky = y[1] "," y[2] "," y[3]
+                if (kx != ky) {
+                    dd++; if (!first) first = i
+                    if (shown++ < limit) printf "    line %d: DATA  C++: %s | R: %s\n", i, a[i], b[i]
+                    continue
+                }
+                if (x[4] != y[4]) {
+                    ld++; if (!first) first = i
+                    if (index(x[4], ";") || index(y[4], ";")) md++
+                    if (shown++ < limit) printf "    line %d: LABEL %s  C++: %s | R: %s\n", i, kx, x[4], y[4]
+                }
+            }
+            printf "SUMMARY %d %d %d %d %d %d\n", na, nb, dd + 0, ld + 0, md + 0, first + 0
+        }' "${cpp_out}.cmp" "${r_out}.cmp" > "${report}"
 
-        label_differences=$((label_differences + 1))
+    local cpp_rows r_rows data_diffs label_diffs multi_diffs first_div
+    read -r _ cpp_rows r_rows data_diffs label_diffs multi_diffs first_div \
+        <<< "$(grep '^SUMMARY' "${report}")"
 
-        # Detect multi-label output.
-        if [[ "${cpp_labels}" == *";"* ||
-              "${r_labels}" == *";"* ]]; then
-            multilabel_differences=$((multilabel_differences + 1))
-        fi
+    # multiset comparison of complete rows (order independent)
+    local cpp_only r_only
+    cpp_only="$(LC_ALL=C comm -23 <(LC_ALL=C sort "${cpp_out}.cmp") <(LC_ALL=C sort "${r_out}.cmp") | wc -l)"
+    r_only="$(LC_ALL=C comm -13 <(LC_ALL=C sort "${cpp_out}.cmp") <(LC_ALL=C sort "${r_out}.cmp") | wc -l)"
 
-        echo
-        echo "Line ${line_no}: LABEL DIFFERENCE"
-        echo "  Data: ${cpp_data}"
-        echo "  C++ labels: ${cpp_labels}"
-        echo "  R labels:   ${r_labels}"
+    if (( data_diffs == 0 && label_diffs == 0 && cpp_only == 0 && r_only == 0 )); then
+        RESULT="OK"
+        DETAIL="${cpp_rows} rows identical"
+    else
+        RESULT="FAIL"
+        DETAIL="rows C++/R: ${cpp_rows}/${r_rows}, first divergence: line ${first_div}, data: ${data_diffs}, labels: ${label_diffs} (multi-label: ${multi_diffs}), C++-only: ${cpp_only}, R-only: ${r_only}"
+        # keep the detailed differences for the printout
+        grep -v '^SUMMARY' "${report}" > "${TMP_DIR}/${name}.diffs"
+    fi
+}
+
+# ---------------------------------------------------------------
+# Main loop
+# ---------------------------------------------------------------
+n_ok=0; n_fail=0; n_error=0; n_skip=0
+declare -a SUMMARY_LINES=()
+
+echo "Data files: ${#FILES[@]}   (RUNS=${RUNS})"
+echo
+
+for f in "${FILES[@]}"; do
+    name="$(basename "${f}")"
+    verify_file "${f}"
+
+    case "${RESULT}" in
+        OK)    n_ok=$((n_ok + 1)) ;;
+        FAIL)  n_fail=$((n_fail + 1)) ;;
+        ERROR) n_error=$((n_error + 1)) ;;
+        SKIP)  n_skip=$((n_skip + 1)) ;;
+    esac
+
+    if [[ "${RESULT}" == "OK" || "${RESULT}" == "FAIL" ]]; then
+        line="$(printf '%-6s %-24s %s  [C++ %d ms, R %d ms]' \
+                "${RESULT}" "${name}" "${DETAIL}" "${CPP_MS}" "${R_MS}")"
+    else
+        line="$(printf '%-6s %-24s %s' "${RESULT}" "${name}" "${DETAIL}")"
+    fi
+    SUMMARY_LINES+=("${line}")
+
+    echo "${line}"
+    if [[ "${RESULT}" == "FAIL" && -s "${TMP_DIR}/${name}.diffs" ]]; then
+        cat "${TMP_DIR}/${name}.diffs"
     fi
 done
 
-###############################################################################
-# Hash comparison
-#
-# Hash complete rows, but preserve multiplicity.
-###############################################################################
-
-echo
-echo "=== Hashing rows ==="
-
-declare -A CPP_HASHES
-declare -A R_HASHES
-
-while IFS= read -r line || [[ -n "${line}" ]]; do
-    [[ "${line}" == \#* ]] && continue
-    [[ -z "${line}" ]] && continue
-
-    hash="$(printf '%s' "${line}" | sha256sum | cut -d' ' -f1)"
-    CPP_HASHES["${hash}"]=$(( ${CPP_HASHES["${hash}"]:-0} + 1 ))
-done < "${CPP_OUT}"
-
-while IFS= read -r line || [[ -n "${line}" ]]; do
-    [[ "${line}" == \#* ]] && continue
-    [[ -z "${line}" ]] && continue
-
-    hash="$(printf '%s' "${line}" | sha256sum | cut -d' ' -f1)"
-    R_HASHES["${hash}"]=$(( ${R_HASHES["${hash}"]:-0} + 1 ))
-done < "${R_OUT}"
-
-cpp_only=0
-r_only=0
-
-for hash in "${!CPP_HASHES[@]}"; do
-    cpp_count="${CPP_HASHES["${hash}"]}"
-    r_count="${R_HASHES["${hash}"]:-0}"
-
-    if (( cpp_count > r_count )); then
-        cpp_only=$((cpp_only + cpp_count - r_count))
-    fi
-done
-
-for hash in "${!R_HASHES[@]}"; do
-    r_count="${R_HASHES["${hash}"]}"
-    cpp_count="${CPP_HASHES["${hash}"]:-0}"
-
-    if (( r_count > cpp_count )); then
-        r_only=$((r_only + r_count - cpp_count))
-    fi
-done
-
-difference_count=$((cpp_only + r_only))
-
-###############################################################################
-# Timing
-###############################################################################
-
-echo
-echo "=== Timing (${RUNS} runs) ==="
-
-cpp_total=0
-r_total=0
-
-for ((i = 1; i <= RUNS; i++)); do
-    time="$(measure_cpp "${TMP_DIR}/cpp_${i}.csv")"
-    cpp_total=$((cpp_total + time))
-done
-
-for ((i = 1; i <= RUNS; i++)); do
-    time="$(measure_r "${TMP_DIR}/r_${i}.csv")"
-    r_total=$((r_total + time))
-done
-
-cpp_avg=$((cpp_total / RUNS))
-r_avg=$((r_total / RUNS))
-
-###############################################################################
+# ---------------------------------------------------------------
 # Result
-###############################################################################
-
+# ---------------------------------------------------------------
 echo
 echo "========================================"
 echo "Verification result"
 echo "========================================"
-
-echo "C++ rows          : ${cpp_rows}"
-echo "R rows            : ${r_rows}"
-
-if (( divergence_line == 0 )); then
-    echo "First divergence  : none"
-else
-    echo "First divergence  : line ${divergence_line}"
-fi
-
+echo "OK      : ${n_ok}"
+echo "FAIL    : ${n_fail}"
+echo "ERROR   : ${n_error}"
+echo "SKIPPED : ${n_skip}"
 echo
-echo "Data differences  : ${data_differences}"
-echo "Label differences : ${label_differences}"
-echo "Multi-label diffs : ${multilabel_differences}"
-
-echo
-echo "Exact row differences"
-echo "C++-only rows     : ${cpp_only}"
-echo "R-only rows       : ${r_only}"
-echo "Total differences : ${difference_count}"
-
-echo
-echo "Runtime"
-echo "----------------------------------------"
-echo "C++ first run     : ${CPP_TIME_MS} ms"
-echo "R first run       : ${R_TIME_MS} ms"
-echo "C++ average       : ${cpp_avg} ms"
-echo "R average         : ${r_avg} ms"
-
-if (( cpp_avg > 0 )); then
-    printf "R/C++ ratio       : %.2fx\n" \
-        "$(awk "BEGIN { print ${r_avg} / ${cpp_avg} }")"
-fi
-
-echo
-echo "Temporary files"
-echo "----------------------------------------"
-echo "C++ output        : ${CPP_OUT}"
-echo "R output          : ${R_OUT}"
+echo "Temporary files: ${TMP_DIR}"
+echo "  <name>.cpp.csv / <name>.r.csv  (raw outputs)"
+echo "  <name>.*.err                   (stderr of the runs)"
 echo "========================================"
 
-###############################################################################
-# Exit status
-###############################################################################
-
-if (( difference_count > 0 )); then
+if (( n_fail > 0 || n_error > 0 )); then
     exit 1
 fi
-
 exit 0

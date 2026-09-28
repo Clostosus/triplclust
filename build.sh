@@ -49,7 +49,7 @@ echo "=== Sources copied ==="
 #  3) Build the R package (this will compile the temporary sources as well)
 # -----------------------------------------------------------------
 echo "=== Building R package ==="
-Rscript "${PKG_DIR}/build.R" "${PKG_DIR}"
+Rscript "${PKG_DIR}/build.R" "${PKG_DIR}" --install
 echo "=== R package built ==="
 
 # -----------------------------------------------------------------

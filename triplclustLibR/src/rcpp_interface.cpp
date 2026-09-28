@@ -1,4 +1,6 @@
 #include <Rcpp.h>
+#include <cmath>
+#include "dnn.h"
 #include "triplclust.hpp"
 #include "pointcloud.h"
 
@@ -23,13 +25,18 @@ static Rcpp::List triplclust_impl(
         cloud.push_back(Point(points(i, 0), points(i, 1), points(i, 2)));
     }
 
+    double dnn = std::sqrt(first_quartile(cloud));
+    if (dnn == 0.0) {
+        Rcpp::stop("dnn computed as zero. Remove duplicate points.");
+    }
+
     // set params and use defaults of triplclust.hpp
     TriplClustParameters params;
-    params.r = r;
+    params.r = r * dnn;
     params.k = k;
     params.n = n;
     params.a = a;
-    params.s = s;
+    params.s = s * dnn;
     params.t = t;
     params.tauto = tauto;
     params.dmax = dmax;
