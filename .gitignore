@@ -20,6 +20,10 @@
 *.mod
 *.smod
 
+# R environment files
+.Rhistory
+.RData
+
 # Buildsystem
 build/
 .vscode/
