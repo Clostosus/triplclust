@@ -2,6 +2,6 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 triplclust_rcpp <- function(points, r = 2.0, k = 19L, n = 2L, a = 0.03, s = 0.33, t = 0.0, tauto = TRUE, dmax = 0.0, is_dmax = FALSE, linkage = "single", m = 5L, verbose = 0L) {
-    .Call(`_triplclustLibR_triplclust_rcpp`, points, r, k, n, a, s, t, tauto, dmax, is_dmax, linkage, m, verbose)
+    .Call(`_triplclust_triplclust_rcpp`, points, r, k, n, a, s, t, tauto, dmax, is_dmax, linkage, m, verbose)
 }
 

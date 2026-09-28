@@ -41,25 +41,52 @@ out_df <- data.frame(
   cluster = clusters
 )
 
-# ---------- 6. Write CSV or a self-contained Gnuplot script ----------
+# ---------- 6. Write CSV or a Gnuplot script (similar to output.cpp) ----------
+# Colors like in compute_cluster_colour() in output.cpp; Cluster k has index k-1
+cluster_colour <- function(label) {
+  idx <- label - 1
+  r <- floor(((idx * 23) %% 19) / 18 * 255)
+  g <- floor(((idx * 23) %% 7)  / 6  * 255)
+  b <- floor(((idx * 23) %% 3)  / 2  * 255)
+  as.integer(r * 65536 + g * 256 + b)
+}
+
 if (!gnuplot) {
   write.csv(out_df, row.names = FALSE, file = stdout())
 } else {
-  cat(paste0("
-set terminal wxt enhanced
-set title 'TriplClust – ", basename(infile), "'
-set xlabel 'X'
-set ylabel 'Y'
-set zlabel 'Z'
-splot '-' using 1:2:3:4 with points pointtype 7 pointsize 1 notitle
-"))
-  write.table(
-    out_df,
-    row.names = FALSE,
-    col.names = FALSE,
-    sep = " ",
-    quote = FALSE,
-    file = stdout()
-  )
-  cat("e\n")
+  # Value range like find_min_max_point(): when min == max, +-1 is taken
+  axis_range <- function(v) {
+    lo <- min(v); hi <- max(v)
+    if (hi > lo) c(lo, hi) else c(lo - 1, hi + 1)
+  }
+  for (ax in c("x", "y", "z")) {
+    rg <- axis_range(out_df[[ax]])
+    cat(sprintf("set %srange [%.6f:%.6f]\n", ax, rg[1], rg[2]))
+  }
+
+  # Punktblock einer Serie (endet mit "e")
+  points_block <- function(df) {
+    paste0(paste(sprintf("%.6f %.6f %.6f", df$x, df$y, df$z), collapse = "\n"),
+           "\ne\n")
+  }
+
+  series <- character(0)
+  blocks <- character(0)
+
+  # Noise first (label 0), red
+  noise <- out_df$cluster == 0
+  if (any(noise)) {
+    series <- c(series, "'-' with points lc 'red' title 'noise'")
+    blocks <- c(blocks, points_block(out_df[noise, ]))
+  }
+  # then each cluster with its own color and title 'curve N'
+  for (lab in sort(unique(out_df$cluster[!noise]))) {
+    series <- c(series, sprintf("'-' with points lc '#%06x' title 'curve %d'",
+                                cluster_colour(lab), lab))
+    blocks <- c(blocks, points_block(out_df[out_df$cluster == lab, ]))
+  }
+
+  cat("splot ", paste(series, collapse = ", "), "\n", sep = "")
+  cat(blocks, sep = "")
+  cat("pause mouse keypress\n")
 }

@@ -16,5 +16,6 @@ clean_package() {
 clean_package
 
 if [[ "${1:-}" != "--package-only" ]]; then
-  rm -rf "${BUILD_DIR}"
+  [ -z "${BUILD_DIR:-}" ] && { echo "BUILD_DIR is empty – abort"; exit 1; }
+  find "${BUILD_DIR}" -mindepth 1 -exec rm -rf {} +   # ← einzeilig
 fi

@@ -1,4 +1,4 @@
-Package: triplclustLibR
+Package: triplclust
 Type: Package
 Title: R Interface to the TriplClust Algorithm
 Version: 1.0.0

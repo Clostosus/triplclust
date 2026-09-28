@@ -49,14 +49,13 @@ msg "Loading R package and checking exported symbol ..."
 Rscript - <<'R_EOF'
 pkg <- "triplclust"                     # <-- package name as in DESCRIPTION/NAMESPACE
 if (!requireNamespace(pkg, quietly = TRUE)) {
-  quit(status = 1, message = paste0("Package ", pkg, " not installed"))
+  quit(status = 1)
 }
 library(pkg, character.only = TRUE)
 
 # Check that the exported function is present
 if (!("triplclust_rcpp" %in% ls(paste0("package:", pkg)))) {
-  quit(status = 1,
-       message = "Exported function triplclust_rcpp not found in the package namespace")
+  quit(status = 1)
 }
 quit(status = 0)
 R_EOF
