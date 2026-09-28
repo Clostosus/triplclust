@@ -6,6 +6,9 @@
 #    ./triplclustLibR/verify.sh              # all *.dat files in data/
 #    ./triplclustLibR/verify.sh a.dat b.dat  # only the given files
 #
+#  Each file is checked with defaults, custom dNN-scaled values, absolute
+#  distances, and a dNN-scaled maximum gap.
+#
 #  Environment:
 #    DATA_DIR  directory with test data   (default: <project>/data)
 #    RUNS      timing runs per file       (default: 1)
@@ -25,6 +28,7 @@ MAX_SHOW="${MAX_SHOW:-10}"
 
 CPP_BINARY="${PROJECT_ROOT}/build/triplclust"
 R_SCRIPT="${R_PACKAGE_ROOT}/tests/use_triplclust.R"
+PROFILES=(defaults dnn_scale absolute_distance dnn_gap)
 
 TMP_DIR="$(mktemp -d)"
 
@@ -96,11 +100,32 @@ R_MS=0
 
 verify_file() {
     local input="$1"
+    local profile="$2"
     local name; name="$(basename "${input}")"
-    local cpp_out="${TMP_DIR}/${name}.cpp.csv"
-    local r_out="${TMP_DIR}/${name}.r.csv"
+    local test_name="${name}.${profile}"
+    local cpp_out="${TMP_DIR}/${test_name}.cpp.csv"
+    local r_out="${TMP_DIR}/${test_name}.r.csv"
+    local -a cpp_args=()
 
     RESULT=""; DETAIL=""; CPP_MS=0; R_MS=0
+
+    case "${profile}" in
+        defaults)
+            ;;
+        dnn_scale)
+            cpp_args=(-r 1.5dNN -s 0.25dNN -k 13 -n 3 -a 0.05 -m 4 -link complete)
+            ;;
+        absolute_distance)
+            cpp_args=(-r 1.5 -s 0.25 -dmax 2.5 -k 13 -n 3 -a 0.05 -m 4 -link average)
+            ;;
+        dnn_gap)
+            cpp_args=(-dmax 1.5dNN)
+            ;;
+        *)
+            RESULT="ERROR"; DETAIL="unknown parameter profile: ${profile}"
+            return
+            ;;
+    esac
 
     if [[ ! -f "${input}" ]]; then
         RESULT="ERROR"; DETAIL="file not found"
@@ -114,13 +139,13 @@ verify_file() {
     fi
 
     # --- run both implementations ---
-    if ! time_cmd "${cpp_out}" "${CPP_BINARY}" "${input}"; then
+    if ! time_cmd "${cpp_out}" "${CPP_BINARY}" "${input}" "${cpp_args[@]}"; then
         RESULT="ERROR"; DETAIL="C++ failed: $(head -n 1 "${cpp_out}.err")"
         return
     fi
     CPP_MS="${ELAPSED_MS}"
 
-    if ! time_cmd "${r_out}" "${R_SCRIPT}" "${input}"; then
+    if ! time_cmd "${r_out}" "${R_SCRIPT}" "${input}" "--profile=${profile}"; then
         RESULT="ERROR"; DETAIL="R failed: $(grep -v '^$' "${r_out}.err" | tail -n 1)"
         return
     fi
@@ -130,8 +155,8 @@ verify_file() {
     if (( RUNS > 1 )); then
         local cpp_total="${CPP_MS}" r_total="${R_MS}" i
         for ((i = 2; i <= RUNS; i++)); do
-            time_cmd "${TMP_DIR}/t.cpp" "${CPP_BINARY}" "${input}"; cpp_total=$((cpp_total + ELAPSED_MS))
-            time_cmd "${TMP_DIR}/t.r" "${R_SCRIPT}" "${input}";     r_total=$((r_total + ELAPSED_MS))
+            time_cmd "${TMP_DIR}/t.cpp" "${CPP_BINARY}" "${input}" "${cpp_args[@]}"; cpp_total=$((cpp_total + ELAPSED_MS))
+            time_cmd "${TMP_DIR}/t.r" "${R_SCRIPT}" "${input}" "--profile=${profile}"; r_total=$((r_total + ELAPSED_MS))
         done
         CPP_MS=$((cpp_total / RUNS))
         R_MS=$((r_total / RUNS))
@@ -141,7 +166,7 @@ verify_file() {
     strip_comments "${cpp_out}" "${cpp_out}.cmp"
     strip_comments "${r_out}"   "${r_out}.cmp"
 
-    local report="${TMP_DIR}/${name}.report"
+    local report="${TMP_DIR}/${test_name}.report"
     awk -F, -v limit="${MAX_SHOW}" '
         FILENAME == ARGV[1] { a[FNR] = $0; na = FNR; next }
         { b[FNR] = $0; nb = FNR }
@@ -186,7 +211,7 @@ verify_file() {
         RESULT="FAIL"
         DETAIL="rows C++/R: ${cpp_rows}/${r_rows}, first divergence: line ${first_div}, data: ${data_diffs}, labels: ${label_diffs} (multi-label: ${multi_diffs}), C++-only: ${cpp_only}, R-only: ${r_only}"
         # keep the detailed differences for the printout
-        grep -v '^SUMMARY' "${report}" > "${TMP_DIR}/${name}.diffs"
+        grep -v '^SUMMARY' "${report}" > "${TMP_DIR}/${test_name}.diffs"
     fi
 }
 
@@ -196,32 +221,34 @@ verify_file() {
 n_ok=0; n_fail=0; n_error=0; n_skip=0
 declare -a SUMMARY_LINES=()
 
-echo "Data files: ${#FILES[@]}   (RUNS=${RUNS})"
+echo "Data files: ${#FILES[@]}   Profiles: ${#PROFILES[@]}   (RUNS=${RUNS})"
 echo
 
 for f in "${FILES[@]}"; do
     name="$(basename "${f}")"
-    verify_file "${f}"
+    for profile in "${PROFILES[@]}"; do
+        verify_file "${f}" "${profile}"
 
-    case "${RESULT}" in
-        OK)    n_ok=$((n_ok + 1)) ;;
-        FAIL)  n_fail=$((n_fail + 1)) ;;
-        ERROR) n_error=$((n_error + 1)) ;;
-        SKIP)  n_skip=$((n_skip + 1)) ;;
-    esac
+        case "${RESULT}" in
+            OK)    n_ok=$((n_ok + 1)) ;;
+            FAIL)  n_fail=$((n_fail + 1)) ;;
+            ERROR) n_error=$((n_error + 1)) ;;
+            SKIP)  n_skip=$((n_skip + 1)) ;;
+        esac
 
-    if [[ "${RESULT}" == "OK" || "${RESULT}" == "FAIL" ]]; then
-        line="$(printf '%-6s %-24s %s  [C++ %d ms, R %d ms]' \
-                "${RESULT}" "${name}" "${DETAIL}" "${CPP_MS}" "${R_MS}")"
-    else
-        line="$(printf '%-6s %-24s %s' "${RESULT}" "${name}" "${DETAIL}")"
-    fi
-    SUMMARY_LINES+=("${line}")
+        if [[ "${RESULT}" == "OK" || "${RESULT}" == "FAIL" ]]; then
+            line="$(printf '%-6s %-36s %s  [C++ %d ms, R %d ms]' \
+                    "${RESULT}" "${name} (${profile})" "${DETAIL}" "${CPP_MS}" "${R_MS}")"
+        else
+            line="$(printf '%-6s %-36s %s' "${RESULT}" "${name} (${profile})" "${DETAIL}")"
+        fi
+        SUMMARY_LINES+=("${line}")
 
-    echo "${line}"
-    if [[ "${RESULT}" == "FAIL" && -s "${TMP_DIR}/${name}.diffs" ]]; then
-        cat "${TMP_DIR}/${name}.diffs"
-    fi
+        echo "${line}"
+        if [[ "${RESULT}" == "FAIL" && -s "${TMP_DIR}/${name}.${profile}.diffs" ]]; then
+            cat "${TMP_DIR}/${name}.${profile}.diffs"
+        fi
+    done
 done
 
 # ---------------------------------------------------------------
@@ -237,8 +264,8 @@ echo "ERROR   : ${n_error}"
 echo "SKIPPED : ${n_skip}"
 echo
 echo "Temporary files: ${TMP_DIR}"
-echo "  <name>.cpp.csv / <name>.r.csv  (raw outputs)"
-echo "  <name>.*.err                   (stderr of the runs)"
+echo "  <name>.<profile>.cpp.csv / <name>.<profile>.r.csv  (raw outputs)"
+echo "  <name>.<profile>.*.err                            (stderr of the runs)"
 echo "========================================"
 
 if (( n_fail > 0 || n_error > 0 )); then

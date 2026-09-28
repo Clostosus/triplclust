@@ -3,10 +3,11 @@
 #  Test script for the R package `triplclust`
 # -------------------------------------------------------------
 # Usage:
-#   Rscript use_triplclust.R <input_file> [-gnuplot] > output.csv
+#   Rscript use_triplclust.R <input_file> [-gnuplot] [--profile=<name>] > output.csv
 #
 #   <input_file> : whitespace‑separated file with three columns (x y z)
 #   -gnuplot      : also emit a tiny Gnuplot script on stdout
+#   <name>        : defaults, dnn_scale, absolute_distance, or dnn_gap
 # -------------------------------------------------------------
 
 # ---------- 1. Parse command‑line arguments ----------
@@ -16,6 +17,11 @@ if (length(args) == 0) {
 }
 infile  <- args[1]
 gnuplot <- any(args[-1] %in% "-gnuplot")   # TRUE if “-gnuplot” present
+profile_arg <- grep("^--profile=", args, value = TRUE)
+if (length(profile_arg) > 1) {
+  stop("Only one --profile may be specified.")
+}
+profile <- if (length(profile_arg) == 1) sub("^--profile=", "", profile_arg) else "defaults"
 
 # ---------- 2. Load the installed package ----------
 # The package was installed by ./triplclustLibR/build.sh from the repository root, e.g.
@@ -30,8 +36,18 @@ if (ncol(pts) != 3) {
 }
 pts_mat <- as.matrix(pts)   # numeric matrix (n × 3)
 
-# ---------- 4. Call the C++ function (defaults are taken from the header) ----------
-clusters <- triplclust_rcpp(pts_mat)   # list of clusters (1-based row indices)
+# ---------- 4. Call the C++ function with the selected parameters ----------
+profile_params <- switch(profile,
+  defaults = list(),
+  dnn_scale = list(r = "1.5dNN", s = "0.25dNN", k = 13L, n = 3L, a = 0.05,
+                   m = 4L, linkage = "complete"),
+  absolute_distance = list(r = 1.5, s = 0.25, dmax = 2.5,
+                           k = 13L, n = 3L, a = 0.05, m = 4L,
+                           linkage = "average"),
+  dnn_gap = list(dmax = "1.5dNN"),
+  stop("Unknown verification profile: ", profile)
+)
+clusters <- do.call(triplclust_rcpp, c(list(points = pts_mat), profile_params))
 n <- nrow(pts_mat)
 
 # Per point: the clusters it belongs to (integer(0) = noise, >1 = overlap)
