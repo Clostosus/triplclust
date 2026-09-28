@@ -7,10 +7,10 @@ set -euo pipefail
 # -----------------------------------------------------------------
 #  Paths
 # -----------------------------------------------------------------
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BUILD_DIR="${PROJECT_ROOT}/build"
-PKG_DIR="${PROJECT_ROOT}/triplclustLibR"
-R_PKG_DIR="${PROJECT_ROOT}/triplclustLibR"
+PKG_DIR="${SCRIPT_DIR}"
 PKG_SRC="${PKG_DIR}/src"
 
 # -----------------------------------------------------------------
@@ -28,7 +28,7 @@ echo "=== C++ binary built ==="
 # -----------------------------------------------------------------
 echo "=== Copying all core C++ sources (temporary) ==="
 mkdir -p "${PKG_SRC}"
-"${PROJECT_ROOT}/clean.sh" --package-only
+"${SCRIPT_DIR}/clean.sh" --package-only
 find "${PROJECT_ROOT}/src" -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
   ! -name 'main.cpp' ! -name 'option.cpp' | while read -r srcfile; do
   base="$(basename "${srcfile}")"
@@ -56,7 +56,7 @@ echo "=== R package built ==="
 #  4) **Clean up** – delete the temporary copies we just added
 # -----------------------------------------------------------------
 echo "=== Removing temporary C++ sources from the package ==="
-"${PROJECT_ROOT}/clean.sh" --package-only
+"${SCRIPT_DIR}/clean.sh" --package-only
 echo "=== Cleanup finished ==="
 
 echo "Build completed!"

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PKG_SRC="${PROJECT_ROOT}/triplclustLibR/src"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PKG_SRC="${SCRIPT_DIR}/src"
 BUILD_DIR="${PROJECT_ROOT}/build"
 
 INCLUDE_RPACKAGE=false

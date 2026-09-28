@@ -18,7 +18,7 @@ infile  <- args[1]
 gnuplot <- any(args[-1] %in% "-gnuplot")   # TRUE if “-gnuplot” present
 
 # ---------- 2. Load the installed package ----------
-# The package was installed by ./build.sh into your personal library, e.g.
+# The package was installed by ./triplclustLibR/build.sh from the repository root, e.g.
 #   ~/R/x86_64-pc-linux-gnu-library/4.6
 # No lib.loc is needed – just attach it.
 suppressPackageStartupMessages(library(triplclust))

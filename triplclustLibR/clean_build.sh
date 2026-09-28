@@ -12,10 +12,11 @@
 set -euo pipefail      # abort on any error, treat unset vars as error
 
 # -------------------------------------------------------------
-# 1) CONFIGURATION – adapt only these two lines if you move things
+# 1) CONFIGURATION
 # -------------------------------------------------------------
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PKG_DIR="${PROJECT_ROOT}/triplclustLibR"   # <-- change if you renamed the folder
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PKG_DIR="${SCRIPT_DIR}"
 # -------------------------------------------------------------
 
 # -----------------------------------------------------------------
@@ -29,13 +30,13 @@ err()   { echo -e "\e[1;31m[ERROR]\e[0m $*" >&2; }
 # 2) Clean generated artefacts and the CMake build directory
 # -----------------------------------------------------------------
 msg "Cleaning generated artefacts ..."
-"${PROJECT_ROOT}/clean.sh"
+"${SCRIPT_DIR}/clean.sh"
 
 # -----------------------------------------------------------------
-# 4) Re‑build everything (uses your existing top‑level script)
+# 4) Re-build everything (uses the package build script)
 # -----------------------------------------------------------------
-msg "Running top‑level build script ..."
-if "${PROJECT_ROOT}/build.sh"; then
+msg "Running package build script ..."
+if "${SCRIPT_DIR}/build.sh"; then
     msg "✅  build.sh completed without errors"
 else
     err "❌  build.sh reported a failure – aborting"

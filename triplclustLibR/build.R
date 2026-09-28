@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # -------------------------------------------------------------
-#  build.R – invoked from ./build.sh
+#  build.R - invoked by build.sh
 #  • Generates RcppExports.* files
 #  • Installs the R package if wanted
 # -------------------------------------------------------------
