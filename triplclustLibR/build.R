@@ -34,5 +34,10 @@ Rcpp::compileAttributes()
 # -------------------------------------------------
 #  Install the package (no devtools required)
 # -------------------------------------------------
-install.packages(".", repos = NULL, type = "source",
-                 lib = .libPaths()[1])
+status <- system2(
+  file.path(R.home("bin"), "R"),
+  c("CMD", "INSTALL", paste0("--library=", .libPaths()[1]), normalizePath("."))
+)
+if (!identical(status, 0L)) {
+  stop("R package installation failed with exit status ", status)
+}

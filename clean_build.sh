@@ -15,41 +15,21 @@ set -euo pipefail      # abort on any error, treat unset vars as error
 # 1) CONFIGURATION – adapt only these two lines if you move things
 # -------------------------------------------------------------
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PKG_DIR="${PROJECT_ROOT}/tripclustLibR"   # <-- change if you renamed the folder
+PKG_DIR="${PROJECT_ROOT}/triplclustLibR"   # <-- change if you renamed the folder
 # -------------------------------------------------------------
-
-# derived paths
-BUILD_DIR="${PROJECT_ROOT}/build"
-RPKG_SRC="${PKG_DIR}/src"
-PKG_SRC="${PKG_DIR}/src"
 
 # -----------------------------------------------------------------
 # Helper functions for pretty output
 # -----------------------------------------------------------------
-hline() { printf '%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' -; }
+hline() { printf '%*s\n' 80 '' | tr ' ' -; }
 msg()   { echo -e "\e[1;34m[INFO]\e[0m  $*"; }
 err()   { echo -e "\e[1;31m[ERROR]\e[0m $*" >&2; }
 
 # -----------------------------------------------------------------
-# 2) Clean the R‑package artefacts
+# 2) Clean generated artefacts and the CMake build directory
 # -----------------------------------------------------------------
-msg "Cleaning all generated artefacts ..."
-find "${PKG_SRC}" -type f $-name '*.o' -o -name 'RcppExports.*' -o -name 'triplclust*.so'$ -delete
-# Remove temporary .cpp copies (keep the original rcpp_interface.cpp)
-find "${PKG_SRC}" -type f -name '*.cpp' ! -name 'rcpp_interface.cpp' -delete
-# Remove empty directories (but not the top‑level src/)
-find "${PKG_SRC}" -type d -empty -not -path "${PKG_SRC}" -delete
-
-# -----------------------------------------------------------------
-# 3) Remove the CMake build directory
-# -----------------------------------------------------------------
-msg "Removing CMake build directory ..."
-if [[ -d "${BUILD_DIR}" ]]; then
-    rm -rf "${BUILD_DIR}"
-    msg "Deleted ${BUILD_DIR}"
-else
-    msg "No build directory found – nothing to delete"
-fi
+msg "Cleaning generated artefacts ..."
+"${PROJECT_ROOT}/clean.sh"
 
 # -----------------------------------------------------------------
 # 4) Re‑build everything (uses your existing top‑level script)

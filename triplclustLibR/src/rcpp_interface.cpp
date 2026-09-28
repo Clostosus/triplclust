@@ -7,7 +7,7 @@ using namespace Rcpp;
 // -----------------------------------------------------------------
 //  Internal implementation (no Rcpp export, no default args)
 // -----------------------------------------------------------------
-static Rcpp::NumericVector triplclust_impl(
+static Rcpp::IntegerVector triplclust_impl(
     const Rcpp::NumericMatrix& points,
     double r, int k, int n,
     double a, double s,
@@ -16,6 +16,10 @@ static Rcpp::NumericVector triplclust_impl(
     const std::string& linkage,
     int m, int verbose) {
 
+    if (points.ncol() != 3) {
+        stop("points must be a numeric matrix with exactly three columns");
+    }
+    
     // convert Rcpp::NumericMatrix to PointCloud
     PointCloud cloud;
     for (int i = 0; i < points.nrow(); i++) {
@@ -40,14 +44,23 @@ static Rcpp::NumericVector triplclust_impl(
 
     cluster_group result = triplclust(cloud, params);
 
-    return wrap(result);
+    Rcpp::IntegerVector labels(points.nrow(), 0);
+    for (size_t cluster_index = 0; cluster_index < result.size();
+         ++cluster_index) {
+        for (size_t point_index : result[cluster_index]) {
+            if (point_index < static_cast<size_t>(labels.size())) {
+                labels[point_index] = static_cast<int>(cluster_index + 1);
+            }
+        }
+    }
+    return labels;
 }
 
 // -----------------------------------------------------------------
 //  Exported wrapper – **the only function Rcpp sees**
 // -----------------------------------------------------------------
 //[[Rcpp::export]]
-Rcpp::NumericVector triplclust_rcpp(
+Rcpp::IntegerVector triplclust_rcpp(
     Rcpp::NumericMatrix points,
     double r       = 2.0,
     int    k       = 19,

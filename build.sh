@@ -22,24 +22,33 @@ cmake --build "${BUILD_DIR}"
 echo "=== C++ binary built ==="
 
 # -----------------------------------------------------------------
-#  2) **Temporarily copy** all project C++ source files into the
-#     R package's src/ directory.
-#     After the R package is installed we will delete them again.
+#  2) Copy the algorithm sources and headers into the R package.
+#     R CMD INSTALL builds from a temporary source tree, so the
+#     package must contain all files needed by the shared library.
 # -----------------------------------------------------------------
 echo "=== Copying all core C++ sources (temporary) ==="
 mkdir -p "${PKG_SRC}"
-# Find every .cpp file in the project src/ tree
-find "${PROJECT_ROOT}/src" -type f -name '*.cpp' | while read -r srcfile; do
-  relpath="${srcfile#${PROJECT_ROOT}/src/}"           # e.g. "kdtree/kdtree.cpp"
-  targetdir="${PKG_SRC}/$(dirname "${relpath}")"
-  mkdir -p "${targetdir}"
-  cp "${srcfile}" "${targetdir}/"
+"${PROJECT_ROOT}/clean.sh" --package-only
+find "${PROJECT_ROOT}/src" -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) \
+  ! -name 'main.cpp' ! -name 'option.cpp' ! -name 'fastcluster_dm.cpp' \
+  ! -name 'fastcluster_R_dm.cpp' | while read -r srcfile; do
+  if [[ "${srcfile}" == *.cpp ]]; then
+    cp "${srcfile}" "${PKG_SRC}/$(basename "${srcfile}")"
+  else
+    relpath="${srcfile#${PROJECT_ROOT}/src/}"
+    mkdir -p "${PKG_SRC}/$(dirname "${relpath}")"
+    cp "${srcfile}" "${PKG_SRC}/${relpath}"
+  fi
 done
-# Also copy the wrapper file (if it lives somewhere else; in our case it already
-# is in the package src/, so this step is harmless)
-if [[ -f "${PROJECT_ROOT}/triplclustLibR/src/rcpp_interface.cpp" ]]; then
-  cp "${PROJECT_ROOT}/triplclustLibR/src/rcpp_interface.cpp" "${PKG_SRC}/"
-fi
+# These files are included by fastcluster.cpp and must not also be compiled
+# as independent translation units.
+cp "${PROJECT_ROOT}/src/hclust/fastcluster_dm.cpp" "${PKG_SRC}/fastcluster_dm.inc"
+cp "${PROJECT_ROOT}/src/hclust/fastcluster_R_dm.cpp" "${PKG_SRC}/fastcluster_R_dm.inc"
+sed -i \
+  -e 's/"fastcluster_dm.cpp"/"fastcluster_dm.inc"/' \
+  -e 's/"fastcluster_R_dm.cpp"/"fastcluster_R_dm.inc"/' \
+  "${PKG_SRC}/fastcluster.cpp"
+
 echo "=== Sources copied ==="
 
 # -----------------------------------------------------------------
@@ -53,10 +62,7 @@ echo "=== R package built ==="
 #  4) **Clean up** – delete the temporary copies we just added
 # -----------------------------------------------------------------
 echo "=== Removing temporary C++ sources from the package ==="
-# Delete every .cpp file we copied **except** the original wrapper
-find "${PKG_SRC}" -type f -name '*.cpp' ! -name 'rcpp_interface.cpp' -delete
-# Remove any empty sub‑directories that may remain
-find "${PKG_SRC}" -type d -empty -not -path "${PKG_SRC}" -delete
+"${PROJECT_ROOT}/clean.sh" --package-only
 echo "=== Cleanup finished ==="
 
-echo "Build completed successfully!"
+echo "Build completed!"

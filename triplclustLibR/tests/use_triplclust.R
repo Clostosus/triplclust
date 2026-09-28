@@ -21,7 +21,7 @@ gnuplot <- any(args[-1] %in% "-gnuplot")   # TRUE if “-gnuplot” present
 # The package was installed by ./build.sh into your personal library, e.g.
 #   ~/R/x86_64-pc-linux-gnu-library/4.6
 # No lib.loc is needed – just attach it.
-suppressPackageStartupMessages(library(triplclustLibR))
+suppressPackageStartupMessages(library(triplclust))
 
 # ---------- 3. Read the point cloud ----------
 pts <- read.table(infile, header = FALSE, sep = "", stringsAsFactors = FALSE)
@@ -41,21 +41,25 @@ out_df <- data.frame(
   cluster = clusters
 )
 
-# ---------- 6. Write CSV to stdout (you can redirect it) ----------
-write.csv(out_df, row.names = FALSE, file = stdout())
-
-# ---------- 7. Optional Gnuplot script -----------------------------------------
-if (gnuplot) {
-  # Write a *temporary* CSV file that Gnuplot can read.
-  tmp_csv <- tempfile(fileext = ".csv")
-  write.csv(out_df, row.names = FALSE, file = tmp_csv)
-
-  cat(sprintf("
+# ---------- 6. Write CSV or a self-contained Gnuplot script ----------
+if (!gnuplot) {
+  write.csv(out_df, row.names = FALSE, file = stdout())
+} else {
+  cat(paste0("
 set terminal wxt enhanced
-set title 'TriplClust – %s'
+set title 'TriplClust – ", basename(infile), "'
 set xlabel 'X'
 set ylabel 'Y'
 set zlabel 'Z'
-splot '%s' using 1:2:3:4 with points pointtype 7 pointsize 1 notitle
-", basename(infile), tmp_csv))
+splot '-' using 1:2:3:4 with points pointtype 7 pointsize 1 notitle
+"))
+  write.table(
+    out_df,
+    row.names = FALSE,
+    col.names = FALSE,
+    sep = " ",
+    quote = FALSE,
+    file = stdout()
+  )
+  cat("e\n")
 }
