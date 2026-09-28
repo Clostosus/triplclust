@@ -4,10 +4,8 @@
 
 using namespace Rcpp;
 
-// -----------------------------------------------------------------
 //  Internal implementation (no Rcpp export, no default args)
-// -----------------------------------------------------------------
-static Rcpp::IntegerVector triplclust_impl(
+static Rcpp::List triplclust_impl(
     const Rcpp::NumericMatrix& points,
     double r, int k, int n,
     double a, double s,
@@ -20,7 +18,6 @@ static Rcpp::IntegerVector triplclust_impl(
         stop("points must be a numeric matrix with exactly three columns");
     }
     
-    // convert Rcpp::NumericMatrix to PointCloud
     PointCloud cloud;
     for (int i = 0; i < points.nrow(); i++) {
         cloud.push_back(Point(points(i, 0), points(i, 1), points(i, 2)));
@@ -44,23 +41,22 @@ static Rcpp::IntegerVector triplclust_impl(
 
     cluster_group result = triplclust(cloud, params);
 
-    Rcpp::IntegerVector labels(points.nrow(), 0);
-    for (size_t cluster_index = 0; cluster_index < result.size();
-         ++cluster_index) {
-        for (size_t point_index : result[cluster_index]) {
-            if (point_index < static_cast<size_t>(labels.size())) {
-                labels[point_index] = static_cast<int>(cluster_index + 1);
-            }
+    // One element per cluster: the 1-based row indices of its points.
+    // A point may appear in several clusters (overlap).
+    Rcpp::List clusters(result.size());
+    for (size_t c = 0; c < result.size(); ++c) {
+        Rcpp::IntegerVector idx(result[c].size());
+        for (size_t j = 0; j < result[c].size(); ++j) {
+            idx[j] = static_cast<int>(result[c][j]) + 1;
         }
+        clusters[c] = idx;
     }
-    return labels;
+    return clusters;
 }
 
-// -----------------------------------------------------------------
 //  Exported wrapper – **the only function Rcpp sees**
-// -----------------------------------------------------------------
 //[[Rcpp::export]]
-Rcpp::IntegerVector triplclust_rcpp(
+Rcpp::List triplclust_rcpp(
     Rcpp::NumericMatrix points,
     double r       = 2.0,
     int    k       = 19,
@@ -75,8 +71,6 @@ Rcpp::IntegerVector triplclust_rcpp(
     int    m       = 5,
     int    verbose = 0) {
 
-    // Forward everything to the internal implementation.
-    // No overloads here → Rcpp can generate a single, unambiguous entry.
     return triplclust_impl(points, r, k, n, a, s, t,
                            tauto, dmax, is_dmax, linkage, m, verbose);
 }
