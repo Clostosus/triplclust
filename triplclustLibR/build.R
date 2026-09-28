@@ -19,25 +19,20 @@ if (!file.exists(pkg_dir)) {
 
 setwd(pkg_dir)
 
-# -------------------------------------------------
 #  Install Rcpp if it is not already present
-# -------------------------------------------------
 if (!requireNamespace("Rcpp", quietly = TRUE)) {
   install.packages("Rcpp", repos = "https://cloud.r-project.org")
 }
+if (!requireNamespace("pkgbuild", quietly = TRUE)) {
+  install.packages("pkgbuild", repos = "https://cloud.r-project.org")
+}
 
-# -------------------------------------------------
 #  Generate the Rcpp registration files
-# -------------------------------------------------
 Rcpp::compileAttributes()
 
-# -------------------------------------------------
-#  Install the package (no devtools required)
-# -------------------------------------------------
-status <- system2(
-  file.path(R.home("bin"), "R"),
-  c("CMD", "INSTALL", paste0("--library=", .libPaths()[1]), normalizePath("."))
+#  Build the package
+dir.create("../build/rpackage", recursive = TRUE, showWarnings = FALSE)
+pkgbuild::build(
+  path = ".",
+  dest_path = "../build/rpackage/triplclust.R"
 )
-if (!identical(status, 0L)) {
-  stop("R package installation failed with exit status ", status)
-}

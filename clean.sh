@@ -5,6 +5,24 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_SRC="${PROJECT_ROOT}/triplclustLibR/src"
 BUILD_DIR="${PROJECT_ROOT}/build"
 
+INCLUDE_RPACKAGE=false
+PACKAGE_ONLY=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --include_rpackage)
+      INCLUDE_RPACKAGE=true
+      ;;
+    --package-only)
+      PACKAGE_ONLY=true
+      ;;
+    *)
+      echo "Unknown option: $arg"
+      exit 1
+      ;;
+  esac
+done
+
 clean_package() {
   find "${PKG_SRC}" -type f \
     \( -name '*.o' -o -name 'RcppExports.*' -o -name 'triplclust*.so' \
@@ -15,7 +33,18 @@ clean_package() {
 
 clean_package
 
-if [[ "${1:-}" != "--package-only" ]]; then
-  [ -z "${BUILD_DIR:-}" ] && { echo "BUILD_DIR is empty – abort"; exit 1; }
-  find "${BUILD_DIR}" -mindepth 1 -exec rm -rf {} +   # ← einzeilig
+if [[ "${PACKAGE_ONLY}" == false ]]; then
+  [ -z "${BUILD_DIR:-}" ] && {
+    echo "BUILD_DIR is empty – abort"
+    exit 1
+  }
+
+  if [[ "${INCLUDE_RPACKAGE}" == true ]]; then
+    find "${BUILD_DIR}" -mindepth 1 -exec rm -rf {} +
+  else
+    find "${BUILD_DIR}" -mindepth 1 \
+      ! -path "${BUILD_DIR}/rpackage" \
+      ! -path "${BUILD_DIR}/rpackage/*" \
+      -exec rm -rf {} +
+  fi
 fi
