@@ -1,7 +1,14 @@
-Package: triplclust
+Package: triplclustLibR
+Type: Package
 Version: 1.0.0
-Title: R Interface to TriplClust
+Title: R Interface to the TriplClust algorithm
+Authors@R: person("John", "Doe", email = "john.doe@example.com",
+                 role = c("aut"))
+Description: R wrapper calling the 
+    TriplClust C++ code from R.
 Depends: R (>= 3.5.0)
-LinkingTo: Rcpp
-Imports: Rcpp
 License: GPL-3
+LinkingTo: Rcpp
+Imports: Rcpp (>= 1.0.0)
+Encoding: UTF-8
+RoxygenNote: 7.3.2
