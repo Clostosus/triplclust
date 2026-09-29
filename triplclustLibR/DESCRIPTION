@@ -2,7 +2,7 @@ Package: triplclust
 Type: Package
 Title: R Interface to the TriplClust Algorithm
 Version: 1.0.0
-Authors@R: person("Vitali", "Krieger", email = "vitali.krieger@tutanota.de",role = c("aut","cre"))
+Authors@R: person("Vitali", "Krieger", email = "empty@example.com",role = c("aut","cre"))
 Description: An R package for using the TriplClust algorithm for detecting and separating curves in 3D point clouds.
 Depends: R (>= 3.5.0)
 License: GPL-3.0
