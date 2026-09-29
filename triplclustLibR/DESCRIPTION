@@ -2,12 +2,14 @@ Package: triplclust
 Type: Package
 Title: R Interface to the TriplClust Algorithm
 Version: 1.0.0
-Authors@R: person("Vitali", "Krieger", email = "vitali.kriegerREMOVETHIS@tutanota.de",role = c("aut","cre"))
+Authors@R: person("Vitali", "Krieger", email = "vitali.krieger@tutanota.de",role = c("aut","cre"))
 Description: An R package for using the TriplClust algorithm for detecting and separating curves in 3D point clouds.
 Depends: R (>= 3.5.0)
 License: GPL-3.0
-LinkingTo: Rcpp
+URL: https://github.com/Clostosus/triplclust
+BugReports: https://github.com/Clostosus/triplclust/issues
 Imports: Rcpp (>= 1.0.0)
+LinkingTo: Rcpp
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+Config/roxygen2/version: 8.1.0

@@ -1,0 +1,67 @@
+.
+├── cdist-plot.r
+├── CHANGES
+├── CMakeLists.txt
+├── data
+│   ├── attpc.dat
+│   ├── lidar.dat
+│   ├── radar.dat
+│   ├── README.md
+│   ├── synthetic-clean.dat
+│   ├── synthetic-noise.dat
+│   └── tennis.dat
+├── LICENSE
+├── README.md
+├── src
+│   ├── cluster.cpp
+│   ├── cluster.h
+│   ├── dnn.cpp
+│   ├── dnn.h
+│   ├── graph.cpp
+│   ├── graph.h
+│   ├── hclust
+│   │   ├── fastcluster.cpp
+│   │   ├── fastcluster_dm.cpp
+│   │   ├── fastcluster.h
+│   │   ├── fastcluster_R_dm.cpp
+│   │   ├── LICENSE
+│   │   └── README
+│   ├── kdtree
+│   │   ├── kdtree.cpp
+│   │   ├── kdtree.hpp
+│   │   ├── LICENSE
+│   │   └── README
+│   ├── main.cpp
+│   ├── option.cpp
+│   ├── option.h
+│   ├── output.cpp
+│   ├── output.h
+│   ├── pointcloud.cpp
+│   ├── pointcloud.h
+│   ├── triplclust.cpp
+│   ├── triplclust.hpp
+│   ├── triplet.cpp
+│   ├── triplet.h
+│   ├── util.cpp
+│   └── util.h
+├── test.dat
+├── tree.txt
+└── triplclustLibR
+    ├── build.R
+    ├── build.sh
+    ├── clean_build.sh
+    ├── clean.sh
+    ├── DESCRIPTION
+    ├── man
+    ├── NAMESPACE
+    ├── R
+    │   └── RcppExports.R
+    ├── README.md
+    ├── src
+    │   ├── Makevars
+    │   └── rcpp_interface.cpp
+    ├── tests
+    │   └── use_triplclust.R
+    └── verify.sh
+
+10 directories, 55 files

@@ -2,5 +2,5 @@
 # Declare that the compiled code lives in the shared object
 useDynLib(triplclust, .registration = TRUE)
 import(Rcpp)
-# Export the R‑visible function
+# Export the only R‑visible function
 export(triplclust_rcpp)

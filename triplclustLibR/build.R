@@ -27,9 +27,9 @@ if (!requireNamespace("Rcpp", quietly = TRUE)) {
 if (!requireNamespace("pkgbuild", quietly = TRUE)) {
   install.packages("pkgbuild", repos = "https://cloud.r-project.org")
 }
+library(devtools)
 
-#  Generate the Rcpp registration files
-Rcpp::compileAttributes()
+devtools::document(roclets = c("collate", "rd"))
 
 #  Build the package
 dir.create("../build/rpackage", recursive = TRUE, showWarnings = FALSE)
