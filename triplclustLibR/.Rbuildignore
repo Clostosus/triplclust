@@ -1,3 +1,6 @@
 ^.*\.sh$
 ^\.git($|/)
 ^\.\.Rcheck$
+^build\.R$
+^lic_cran$
+^src/.*\.(o|so)$

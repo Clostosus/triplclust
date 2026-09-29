@@ -70,7 +70,7 @@ fi
 
 hline
 msg "All done – you can now run your demo script, e.g.:"
-msg "  ${PKG_DIR}/tests/use_triplclust.R test.dat > test.csv"
-msg "  ${PKG_DIR}/tests/use_triplclust.R test.dat -gnuplot | gnuplot -persist"
+msg "  ${PKG_DIR}/inst/scripts/use_triplclust.R test.dat > test.csv"
+msg "  ${PKG_DIR}/inst/scripts/use_triplclust.R test.dat -gnuplot | gnuplot -persist"
 hline
 exit 0

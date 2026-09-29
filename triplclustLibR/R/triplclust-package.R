@@ -6,3 +6,5 @@
 #' @docType package
 #' @keywords internal
 "_PACKAGE"
+
+utils::globalVariables("_triplclust_triplclust_rcpp")

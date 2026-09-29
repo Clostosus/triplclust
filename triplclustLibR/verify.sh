@@ -27,7 +27,7 @@ RUNS="${RUNS:-1}"
 MAX_SHOW="${MAX_SHOW:-10}"
 
 CPP_BINARY="${PROJECT_ROOT}/build/triplclust"
-R_SCRIPT="${R_PACKAGE_ROOT}/tests/use_triplclust.R"
+R_SCRIPT="${R_PACKAGE_ROOT}/inst/scripts/use_triplclust.R"
 PROFILES=(defaults dnn_scale absolute_distance dnn_gap)
 
 TMP_DIR="$(mktemp -d)"
