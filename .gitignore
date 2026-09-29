@@ -23,6 +23,7 @@
 # R environment files
 .Rhistory
 .RData
+..Rcheck
 
 # Buildsystem
 build/

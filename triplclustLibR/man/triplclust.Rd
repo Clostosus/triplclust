@@ -18,11 +18,11 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Vitali Krieger \email{empty@example.com}
+\strong{Maintainer}: Alex Smith \email{webmasterprak@gmail.com}
 
 Authors:
 \itemize{
-  \item Vitali Krieger \email{empty@example.com}
+  \item Alex Smith \email{webmasterprak@gmail.com}
 }
 
 }
