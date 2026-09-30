@@ -30,6 +30,8 @@ clean_package() {
        -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' \) \
     ! -name 'rcpp_interface.cpp' -delete
   find "${PKG_SRC}" -type d -empty -not -path "${PKG_SRC}" -delete
+  rm -rf "${PKG_SRC}/hclust"
+  rm -rf "${PKG_SRC}/kdtree"
 }
 
 clean_package

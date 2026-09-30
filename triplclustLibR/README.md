@@ -2,25 +2,13 @@
 
 R package providing an interface to the **TriplClust** algorithm for 3D point-cloud clustering.
 
-## System requirements (Debian / Ubuntu)
+## Installation
+To install the package in R without CRAN, you need the tarball(tar.gz) of the package.
 
-To build the package from source you need the following libraries:
-
-```bash
-sudo apt update
-sudo apt install -y libharfbuzz-dev libfribidi-dev libuv1-dev
-R -e "install.packages(c('devtools','roxygen2'), repos='https://cloud.r-project.org')"
-R -e "devtools::document()"
 ```
-
-## installation
-The R interface is built and installed from the repository root with:
-
-```bash
-     ./triplclustLibR/build.sh
+install.packages("pathtofile/triplclust_1.0.0.tar.gz",
+                 repos = NULL, type = "source")
 ```
-
-This installs the `triplclust` package and exports `triplclust_rcpp()`.
 
 ## Basic usage
 The function accepts an `n x 3` numeric matrix and returns one integer cluster
@@ -44,6 +32,27 @@ distances, while strings with a `dNN` suffix are relative to the characteristic
 point spacing. The defaults are `r = "2dNN"`, `s = "0.33dNN"`, and
 `dmax = "none"`. For example, use `r = 2.0` for an absolute radius or
 `dmax = "1.5dNN"` to split clusters at a relative gap threshold.
+
+## Build
+### System requirements (Debian / Ubuntu)
+
+To build the package from source you need the following libraries:
+
+```bash
+sudo apt update
+sudo apt install -y libharfbuzz-dev libfribidi-dev libuv1-dev
+R -e "install.packages(c('devtools','roxygen2'), repos='https://cloud.r-project.org')"
+R -e "devtools::document()"
+```
+
+### installation
+The R interface is built and installed from the repository root with:
+
+```bash
+     ./triplclustLibR/build.sh
+```
+
+This installs the `triplclust` package and exports `triplclust_rcpp()`.
 
 For a complete clean rebuild and a package check afterwards, run from the repository root:
 

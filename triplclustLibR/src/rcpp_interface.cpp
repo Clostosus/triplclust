@@ -68,8 +68,24 @@ static Rcpp::List triplclust_impl(
     const std::string& linkage,
     int m, int verbose) {
 
+    // # input validation
     if (points.ncol() != 3) {
         stop("points must be a numeric matrix with exactly three columns");
+    }
+    if (k <= 0) {
+    Rcpp::stop("k must be a positive integer");
+    }
+    if (n <= 0) {
+        Rcpp::stop("n must be a positive integer");
+    }
+    if (a <= 0.0 || a >= 1.0) {
+        Rcpp::stop("a must be in (0, 1)");
+    }
+    if (m < 1) {
+        Rcpp::stop("m (minimum triplets per cluster) must be at least 1");
+    }
+    if (linkage != "single" && linkage != "complete" && linkage != "average") {
+        Rcpp::stop("linkage must be 'single', 'complete', or 'average'");
     }
     
     PointCloud cloud;

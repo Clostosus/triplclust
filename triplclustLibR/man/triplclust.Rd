@@ -26,10 +26,6 @@ Authors:
   \item Christoph Dalitz [copyright holder]
   \item Jens Wilberg [copyright holder]
   \item Lukas Aymans [copyright holder]
-}
-
-Other contributors:
-\itemize{
   \item Daniel Müllner [copyright holder]
 }
 
