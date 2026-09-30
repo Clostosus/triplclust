@@ -145,18 +145,26 @@ verify_file() {
     fi
     CPP_MS="${ELAPSED_MS}"
 
-    if ! time_cmd "${r_out}" "${R_SCRIPT}" "${input}" "--profile=${profile}"; then
+    if ! time_cmd "${r_out}" Rscript --vanilla --quiet "${R_SCRIPT}" "${input}" "--profile=${profile}"; then
         RESULT="ERROR"; DETAIL="R failed: $(grep -v '^$' "${r_out}.err" | tail -n 1)"
         return
     fi
-    R_MS="${ELAPSED_MS}"
+
+    # Extract the timing line that the R script printed to stderr.
+    # If it is missing we fall back to the whole‑script elapsed time
+    # (stored in ELAPSED_MS by time_cmd).  This keeps the old behaviour
+    # intact for older versions of the script.
+    R_MS=$(grep -m1 '^# R-call' "${r_out}.err" | awk '{print int($3)}')
+    if [[ -z "${R_MS}" ]]; then
+        R_MS="${ELAPSED_MS}"
+    fi
 
     # --- optional additional timing runs ---
     if (( RUNS > 1 )); then
         local cpp_total="${CPP_MS}" r_total="${R_MS}" i
         for ((i = 2; i <= RUNS; i++)); do
             time_cmd "${TMP_DIR}/t.cpp" "${CPP_BINARY}" "${input}" "${cpp_args[@]}"; cpp_total=$((cpp_total + ELAPSED_MS))
-            time_cmd "${TMP_DIR}/t.r" "${R_SCRIPT}" "${input}" "--profile=${profile}"; r_total=$((r_total + ELAPSED_MS))
+            time_cmd "${TMP_DIR}/t.r" Rscript --vanilla --quiet "${R_SCRIPT}" "${input}" "--profile=${profile}"; r_total=$((r_total + ELAPSED_MS))
         done
         CPP_MS=$((cpp_total / RUNS))
         R_MS=$((r_total / RUNS))

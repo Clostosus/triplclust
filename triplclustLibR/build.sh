@@ -57,6 +57,15 @@ echo "=== R package built ==="
 # -----------------------------------------------------------------
 echo "=== Removing temporary C++ sources from the package ==="
 "${SCRIPT_DIR}/clean.sh" --package-only
-echo "=== Cleanup finished ==="
 
+echo "=== R package built ==="
+echo "=== Cleanup finished ==="
+ 
+# -----------------------------------------------------------------
+# 5) Create a CRAN‑compatible source tarball
+# -----------------------------------------------------------------
+echo "=== Creating CRAN source distribution ==="
+${SCRIPT_DIR}/makecrandist.sh
+echo "=== CRAN tarball is in ${PROJECT_ROOT}/build/cran/ ==="
+ 
 echo "Build completed!"

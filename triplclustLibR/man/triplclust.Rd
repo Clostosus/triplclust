@@ -18,11 +18,19 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Alex Smith \email{webmasterprak@gmail.com}
+\strong{Maintainer}: Vitali Krieger \email{webmasterprak@gmail.com}
 
 Authors:
 \itemize{
-  \item Alex Smith \email{webmasterprak@gmail.com}
+  \item Vitali Krieger \email{webmasterprak@gmail.com}
+  \item Christoph Dalitz [copyright holder]
+  \item Jens Wilberg [copyright holder]
+  \item Lukas Aymans [copyright holder]
+}
+
+Other contributors:
+\itemize{
+  \item Daniel Müllner [copyright holder]
 }
 
 }

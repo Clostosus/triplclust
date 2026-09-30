@@ -3,7 +3,7 @@
 #  Test script for the R package `triplclust`
 # -------------------------------------------------------------
 # Usage:
-#   Rscript use_triplclust.R <input_file> [-gnuplot] [--profile=<name>] > output.csv
+# Rscript use_triplclust.R <input_file> [-gnuplot] <name> > output.csv
 #
 #   <input_file> : whitespace‑separated file with three columns (x y z)
 #   -gnuplot      : also emit a tiny Gnuplot script on stdout
@@ -21,13 +21,22 @@ profile_arg <- grep("^--profile=", args, value = TRUE)
 if (length(profile_arg) > 1) {
   stop("Only one --profile may be specified.")
 }
-profile <- if (length(profile_arg) == 1) sub("^--profile=", "", profile_arg) else "defaults"
+profile <- if (length(profile_arg) == 1)
+  sub("^--profile=", "", profile_arg) else "defaults"
 
 # ---------- 2. Load the installed package ----------
-# The package was installed by ./triplclustLibR/build.sh from the repository root, e.g.
-#   ~/R/x86_64-pc-linux-gnu-library/4.6
-# No lib.loc is needed – just attach it.
-suppressPackageStartupMessages(library(triplclust))
+# Load the package only when it is not already attached.
+if (!"triplclust" %in% loadedNamespaces()) {
+  # `requireNamespace` loads the namespace without attaching the package;
+  # we then attach it with `library(..., character.only = TRUE)` 
+  # to get the exported symbols.
+  if (!requireNamespace("triplclust", quietly = TRUE)) {
+    stop("Package 'triplclust' is not installed – run ./build.sh first.")
+  }
+  suppressPackageStartupMessages(
+    library("triplclust", character.only = TRUE, quietly = TRUE)
+  )
+}
 
 # ---------- 3. Read the point cloud ----------
 pts <- read.table(infile, header = FALSE, sep = "", stringsAsFactors = FALSE)
@@ -47,7 +56,15 @@ profile_params <- switch(profile,
   dnn_gap = list(dmax = "1.5dNN"),
   stop("Unknown verification profile: ", profile)
 )
-clusters <- do.call(triplclust_rcpp, c(list(points = pts_mat), profile_params))
+
+# ---- measure ONLY the triplclust_rcpp call ---------------------------
+t0 <- proc.time()
+clusters <- do.call(triplclust_rcpp,
+                    c(list(points = pts_mat), profile_params))
+elapsed_ms <- (proc.time() - t0)[["elapsed"]] * 1000
+cat(sprintf("# R-call %.1f ms\n", elapsed_ms), file = stderr())
+# ------------------------------------------------------------------------
+
 n <- nrow(pts_mat)
 
 # Per point: the clusters it belongs to (integer(0) = noise, >1 = overlap)
