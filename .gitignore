@@ -40,8 +40,10 @@ anRpackage/
 *.la
 *.a
 *.lib
+*.gz
 
 # Executables
 *.exe
 *.out
 *.app
+tree.txt

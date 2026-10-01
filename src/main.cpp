@@ -16,7 +16,7 @@
 #include "option.h"
 #include "output.h"
 #include "pointcloud.h"
-#include "triplclust.hpp"
+#include "triplclust.h"
 
 // usage message
 const char *usage =

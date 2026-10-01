@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <string>
 #include "dnn.h"
-#include "triplclust.hpp"
+#include "triplclust.h"
 #include "pointcloud.h"
 
 using namespace Rcpp;

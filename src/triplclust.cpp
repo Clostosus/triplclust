@@ -3,7 +3,7 @@
 //     Library implementation of the TriplClust algorithm.
 //
 
-#include "triplclust.hpp"
+#include "triplclust.h"
 
 #include <vector>
 

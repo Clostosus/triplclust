@@ -3,8 +3,8 @@
 //     Library interface for the TriplClust algorithm.
 //
 
-#ifndef TRIPLCLUST_HPP
-#define TRIPLCLUST_HPP
+#ifndef TRIPLCLUST_H
+#define TRIPLCLUST_H
 
 #include <cstddef>
 
