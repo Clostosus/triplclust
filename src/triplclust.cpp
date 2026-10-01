@@ -5,8 +5,11 @@
 
 #include "triplclust.h"
 
+#include <cmath>
+#include <stdexcept>
 #include <vector>
 
+#include "dnn.h"
 #include "graph.h"
 #include "output.h"
 #include "triplet.h"
@@ -104,17 +107,43 @@ bool validate_parameters( const PointCloud          &cloud,
 
 cluster_group triplclust(const PointCloud &cloud,
                          const TriplClustParameters &parameters) {
-  // validate parameters
+    TriplClustParameters scaled_parameters = parameters;
   std::string validationError;
   if (!validate_parameters(cloud, parameters, validationError)) {
         throw std::invalid_argument(validationError);
   }
 
+    const bool needs_dnn = parameters.r_dnn || parameters.s_dnn ||
+                                                 (parameters.is_dmax && parameters.dmax_dnn);
+    if (needs_dnn) {
+        if (cloud.size() < 2) {
+            throw std::invalid_argument(
+                    "[triplclust] at least two points are required to compute dNN");
+        }
+        const double dnn = std::sqrt(first_quartile(cloud));
+        if (!std::isfinite(dnn) || dnn <= 0.0) {
+            throw std::invalid_argument(
+                    "[triplclust] dNN computed as zero. Remove duplicate points.");
+        }
+        if (parameters.r_dnn) scaled_parameters.r *= dnn;
+        if (parameters.s_dnn) scaled_parameters.s *= dnn;
+        if (parameters.is_dmax && parameters.dmax_dnn) {
+            scaled_parameters.dmax *= dnn;
+        }
+    }
+    scaled_parameters.r_dnn = false;
+    scaled_parameters.s_dnn = false;
+    scaled_parameters.dmax_dnn = false;
+
+    if (!validate_parameters(cloud, scaled_parameters, validationError)) {
+        throw std::invalid_argument(validationError);
+    }
+
   // Step 1) smoothing by position averaging of neighboring points
   PointCloud cloud_smooth;
-  smoothen_cloud(cloud, cloud_smooth, parameters.r);
+    smoothen_cloud(cloud, cloud_smooth, scaled_parameters.r);
 
-  if (parameters.verbose > 1) {
+    if (scaled_parameters.verbose > 1) {
     bool rc = cloud_to_csv(cloud_smooth);
     if (!rc)
       std::cerr << "[Error] can't write debug_smoothed.csv" << std::endl;
@@ -125,26 +154,28 @@ cluster_group triplclust(const PointCloud &cloud,
 
   // Step 2) finding triplets of approximately collinear points
   std::vector<triplet> triplets;
-  generate_triplets(cloud_smooth, triplets, parameters.k, parameters.n,
-                    parameters.a);
+    generate_triplets(cloud_smooth, triplets, scaled_parameters.k,
+                                        scaled_parameters.n, scaled_parameters.a);
 
   // Step 3) single link hierarchical clustering of the triplets
   cluster_group cl_group;
-  compute_hc(cloud_smooth, cl_group, triplets, parameters.s, parameters.t,
-             parameters.tauto, parameters.dmax, parameters.is_dmax,
-             parameters.linkage, parameters.verbose);
+    compute_hc(cloud_smooth, cl_group, triplets, scaled_parameters.s,
+                         scaled_parameters.t, scaled_parameters.tauto,
+                         scaled_parameters.dmax, scaled_parameters.is_dmax,
+                         scaled_parameters.linkage, scaled_parameters.verbose);
 
   // Step 4) pruning by removal of small clusters
-  cleanup_cluster_group(cl_group, parameters.m, parameters.verbose);
+    cleanup_cluster_group(cl_group, scaled_parameters.m,
+                                                scaled_parameters.verbose);
   cluster_triplets_to_points(triplets, cl_group);
 
   // Optionally split up clusters at gaps > dmax
-  if (parameters.is_dmax) {
+    if (scaled_parameters.is_dmax) {
     cluster_group cleaned_up_cluster_group;
     for (cluster_group::iterator cl = cl_group.begin(); cl != cl_group.end();
          ++cl) {
-      max_step(cleaned_up_cluster_group, *cl, cloud, parameters.dmax,
-               parameters.m + 2);
+    max_step(cleaned_up_cluster_group, *cl, cloud, scaled_parameters.dmax,
+           scaled_parameters.m + 2);
     }
     cl_group = cleaned_up_cluster_group;
   }

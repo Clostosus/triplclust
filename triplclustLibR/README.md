@@ -22,7 +22,7 @@ cluster.
     pts <- matrix(rnorm(30), ncol = 3)
 
     ## run the clustering function
-    cls <- triplclust_rcpp(pts)
+     cls <- triplclust(pts)
 
     head(cls)   # shows the first few cluster labels (0 = unassigned)
 ```
@@ -32,6 +32,8 @@ distances, while strings with a `dNN` suffix are relative to the characteristic
 point spacing. The defaults are `r = "2dNN"`, `s = "0.33dNN"`, and
 `dmax = "none"`. For example, use `r = 2.0` for an absolute radius or
 `dmax = "1.5dNN"` to split clusters at a relative gap threshold.
+The clustering threshold `t` defaults to `"auto"`; provide a number for a
+fixed threshold, or set `tauto` explicitly to override that choice.
 
 ## Build
 ### System requirements (Debian / Ubuntu)
@@ -52,7 +54,7 @@ The R interface is built and installed from the repository root with:
      ./triplclustLibR/build.sh
 ```
 
-This installs the `triplclust` package and exports `triplclust_rcpp()`.
+This installs the `triplclust` package and exports `triplclust()`.
 
 For a complete clean rebuild and a package check afterwards, run from the repository root:
 

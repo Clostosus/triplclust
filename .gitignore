@@ -24,6 +24,7 @@
 .Rhistory
 .RData
 ..Rcheck
+*.Rcheck/
 
 # Buildsystem
 build/
@@ -46,4 +47,5 @@ anRpackage/
 *.exe
 *.out
 *.app
+
 tree.txt

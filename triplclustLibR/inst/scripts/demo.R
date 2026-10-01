@@ -30,9 +30,9 @@ print(pts)
 # -----------------------------------------------------------------
 #  2) Run the algorithm with the *default* parameters ---------------
 # -----------------------------------------------------------------
-#   The R wrapper (`triplclust_rcpp`) accepts the same arguments
+#   The R wrapper (`triplclust`) accepts numeric and dNN-scaled distances.
 #   that the C++ binary does.  We only set a few to keep the demo short.
-res <- triplclust_rcpp(
+res <- triplclust(
   points = pts,
   r      = 2.0,          # smoothing radius (default = 2 * dNN)
   k      = 19,           # neighbours for triplet creation

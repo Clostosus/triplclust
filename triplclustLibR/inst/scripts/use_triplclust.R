@@ -45,7 +45,7 @@ if (ncol(pts) != 3) {
 }
 pts_mat <- as.matrix(pts)   # numeric matrix (n × 3)
 
-# ---------- 4. Call the C++ function with the selected parameters ----------
+# ---------- 4. Call the R wrapper with the selected parameters ----------
 profile_params <- switch(profile,
   defaults = list(),
   dnn_scale = list(r = "1.5dNN", s = "0.25dNN", k = 13L, n = 3L, a = 0.05,
@@ -57,9 +57,9 @@ profile_params <- switch(profile,
   stop("Unknown verification profile: ", profile)
 )
 
-# ---- measure ONLY the triplclust_rcpp call ---------------------------
+# ---- measure ONLY the triplclust call --------------------------------
 t0 <- proc.time()
-clusters <- do.call(triplclust_rcpp,
+clusters <- do.call(triplclust,
                     c(list(points = pts_mat), profile_params))
 elapsed_ms <- (proc.time() - t0)[["elapsed"]] * 1000
 cat(sprintf("# R-call %.1f ms\n", elapsed_ms), file = stderr())
