@@ -14,7 +14,7 @@ Maintainer: Vitali Krieger <webmasterprak@gmail.com>
 Description: Clusters point-triplets to detect and separate curves in 3-D point clouds.
 	The algorithm is further described in Dalitz et al. (2019) <doi:10.5201/ipol.2019.234>.
 Depends: R (>= 3.5.0)
-License: BSD_2_clause + file LICENSE
+License: file LICENSE
 URL: https://github.com/Clostosus/triplclust
 BugReports: https://github.com/Clostosus/triplclust/issues
 Imports: Rcpp (>= 1.0.0)

@@ -2,6 +2,9 @@
 
 R package providing an interface to the **TriplClust** algorithm for 3D point-cloud clustering.
 
+## Build
+Using `makecrandist.sh` generates a tar.gz file containing the package.
+
 ## Installation
 To install the package in R without CRAN, you need the tarball(tar.gz) of the package.
 
@@ -9,6 +12,10 @@ To install the package in R without CRAN, you need the tarball(tar.gz) of the pa
 install.packages("pathtofile/triplclust_1.0.0.tar.gz",
                  repos = NULL, type = "source")
 ```
+
+## Verification
+In case you cloned the repository, use `verify.sh`.
+For a less extensive verification use the R Scripts from `inst/scripts` that use the triplclust R-function.
 
 ## Basic usage
 The function accepts an `n x 3` numeric matrix and returns one integer cluster
@@ -25,40 +32,4 @@ cluster.
      cls <- triplclust(pts)
 
     head(cls)   # shows the first few cluster labels (0 = unassigned)
-```
-
-Distance arguments follow the C++ program syntax: numeric values are absolute
-distances, while strings with a `dNN` suffix are relative to the characteristic
-point spacing. The defaults are `r = "2dNN"`, `s = "0.33dNN"`, and
-`dmax = "none"`. For example, use `r = 2.0` for an absolute radius or
-`dmax = "1.5dNN"` to split clusters at a relative gap threshold.
-The clustering threshold `t` defaults to `"auto"`; provide a number for a
-fixed threshold, or set `tauto` explicitly to override that choice.
-
-## Build
-### System requirements (Debian / Ubuntu)
-
-To build the package from source you need the following libraries:
-
-```bash
-sudo apt update
-sudo apt install -y libharfbuzz-dev libfribidi-dev libuv1-dev
-R -e "install.packages(c('devtools','roxygen2'), repos='https://cloud.r-project.org')"
-R -e "devtools::document()"
-```
-
-### installation
-The R interface is built and installed from the repository root with:
-
-```bash
-     ./triplclustLibR/build.sh
-```
-
-This installs the `triplclust` package and exports `triplclust()`.
-
-For a complete clean rebuild and a package check afterwards, run from the repository root:
-
-```bash
-     ./triplclustLibR/clean_build.sh
-     ./triplclustLibR/verify.sh
 ```

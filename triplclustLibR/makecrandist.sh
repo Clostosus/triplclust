@@ -29,9 +29,9 @@ rm -f src/*.o src/*.so src/RcppExports.*
 
 # ---------- Step 2: license ----------
 # lic_cran (CRAN's short format) becomes the package LICENSE.
-mkdir -p inst
-cp LICENSE inst/COPYRIGHTS
-mv lic_cran LICENSE
+# mkdir -p inst
+# cp LICENSE inst/COPYRIGHTS
+# mv lic_cran LICENSE
 
 # ---------- Step 3: copy the C++ sources ----------
 cp -r "${ROOT}/src/hclust" "${ROOT}/src/kdtree" src/

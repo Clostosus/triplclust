@@ -1,22 +1,6 @@
 #!/usr/bin/env bash
-# -------------------------------------------------------------
-#  verify.sh - compares the C++ binary with the R package.
-#
-#  Usage:
-#    ./triplclustLibR/verify.sh              # all *.dat files in data/
-#    ./triplclustLibR/verify.sh a.dat b.dat  # only the given files
-#
-#  Each file is checked with defaults, custom dNN-scaled values, absolute
-#  distances, and a dNN-scaled maximum gap.
-#
-#  Environment:
-#    DATA_DIR  directory with test data   (default: <project>/data)
-#    RUNS      timing runs per file       (default: 1)
-#    MAX_SHOW  max. differences printed   (default: 10)
-#
-#  Files that do not have exactly three columns are skipped, because
-#  use_triplclust.R only supports x y z input.
-# -------------------------------------------------------------
+# Compare the C++ binary with the R package.
+# Usage: ./triplclustLibR/verify.sh [file ...]
 set -uo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,25 +16,21 @@ PROFILES=(defaults dnn_scale absolute_distance dnn_gap)
 
 TMP_DIR="$(mktemp -d)"
 
-# ---------------------------------------------------------------
-# Checks
-# ---------------------------------------------------------------
-if [[ ! -x "${CPP_BINARY}" ]]; then
-    echo "ERROR: C++ binary not found or not executable: ${CPP_BINARY}"
-    exit 1
-fi
-if [[ ! -x "${R_SCRIPT}" ]]; then
-    echo "ERROR: R script not found or not executable: ${R_SCRIPT}"
-    exit 1
-fi
-if ! [[ "${RUNS}" =~ ^[1-9][0-9]*$ ]]; then
-    echo "ERROR: RUNS must be a positive integer"
-    exit 1
-fi
+check_prerequisites() {
+    if [[ ! -x "${CPP_BINARY}" ]]; then
+        echo "ERROR: C++ binary not found or not executable: ${CPP_BINARY}" >&2
+        exit 1
+    fi
+    if [[ ! -x "${R_SCRIPT}" ]]; then
+        echo "ERROR: R script not found or not executable: ${R_SCRIPT}" >&2
+        exit 1
+    fi
+    if ! [[ "${RUNS}" =~ ^[1-9][0-9]*$ ]]; then
+        echo "ERROR: RUNS must be a positive integer" >&2
+        exit 1
+    fi
+}
 
-# ---------------------------------------------------------------
-# Collect input files
-# ---------------------------------------------------------------
 FILES=("$@")
 if (( ${#FILES[@]} == 0 )); then
     shopt -s nullglob
@@ -58,19 +38,14 @@ if (( ${#FILES[@]} == 0 )); then
     shopt -u nullglob
 fi
 if (( ${#FILES[@]} == 0 )); then
-    echo "ERROR: no input files found in ${DATA_DIR}"
+    echo "ERROR: no input files found in ${DATA_DIR}" >&2
     exit 1
 fi
 
-# ---------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------
-
-# Runs a command, stdout -> $1, stderr -> $1.err.
-# Sets ELAPSED_MS and returns the exit code of the command.
 ELAPSED_MS=0
 time_cmd() {
-    local out="$1"; shift
+    local out="$1"
+    shift
     local start end rc
     start=$(date +%s%N)
     "$@" > "${out}" 2> "${out}.err"
@@ -80,19 +55,45 @@ time_cmd() {
     return "${rc}"
 }
 
-# Number of columns of the first data line (comments/empty lines ignored)
 count_columns() {
-    awk '!/^[[:space:]]*(#|$)/ { print NF; exit }' "$1"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "${line//[[:space:]]/}" ]] && continue
+        [[ "${line:0:1}" == "#" ]] && continue
+        awk '{ print NF }' <<< "$line"
+        return
+    done < "$1"
+    printf '0\n'
 }
 
-# Removes comment and empty lines
 strip_comments() {
-    grep -v -e '^#' -e '^$' "$1" > "$2" || true
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "${line//[[:space:]]/}" ]] && continue
+        [[ "${line:0:1}" == "#" ]] && continue
+        printf '%s\n' "$line"
+    done < "$1" > "$2"
 }
 
-# ---------------------------------------------------------------
-# Compare one file. Sets RESULT (OK|FAIL|ERROR|SKIP) and DETAIL.
-# ---------------------------------------------------------------
+profile_args() {
+    local profile="$1"
+    case "${profile}" in
+        defaults)
+            return 0
+            ;;
+        dnn_scale)
+            printf '%s\n' -r 1.5dNN -s 0.25dNN -k 13 -n 3 -a 0.05 -m 4 -link complete
+            ;;
+        absolute_distance)
+            printf '%s\n' -r 1.5 -s 0.25 -dmax 2.5 -k 13 -n 3 -a 0.05 -m 4 -link average
+            ;;
+        dnn_gap)
+            printf '%s\n' -dmax 1.5dNN
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 RESULT=""
 DETAIL=""
 CPP_MS=0
@@ -109,23 +110,10 @@ verify_file() {
 
     RESULT=""; DETAIL=""; CPP_MS=0; R_MS=0
 
-    case "${profile}" in
-        defaults)
-            ;;
-        dnn_scale)
-            cpp_args=(-r 1.5dNN -s 0.25dNN -k 13 -n 3 -a 0.05 -m 4 -link complete)
-            ;;
-        absolute_distance)
-            cpp_args=(-r 1.5 -s 0.25 -dmax 2.5 -k 13 -n 3 -a 0.05 -m 4 -link average)
-            ;;
-        dnn_gap)
-            cpp_args=(-dmax 1.5dNN)
-            ;;
-        *)
-            RESULT="ERROR"; DETAIL="unknown parameter profile: ${profile}"
-            return
-            ;;
-    esac
+    if ! mapfile -t cpp_args < <(profile_args "${profile}"); then
+        RESULT="ERROR"; DETAIL="unknown parameter profile: ${profile}"
+        return
+    fi
 
     if [[ ! -f "${input}" ]]; then
         RESULT="ERROR"; DETAIL="file not found"
@@ -138,7 +126,6 @@ verify_file() {
         return
     fi
 
-    # --- run both implementations ---
     if ! time_cmd "${cpp_out}" "${CPP_BINARY}" "${input}" "${cpp_args[@]}"; then
         RESULT="ERROR"; DETAIL="C++ failed: $(head -n 1 "${cpp_out}.err")"
         return
@@ -150,16 +137,11 @@ verify_file() {
         return
     fi
 
-    # Extract the timing line that the R script printed to stderr.
-    # If it is missing we fall back to the whole‑script elapsed time
-    # (stored in ELAPSED_MS by time_cmd).  This keeps the old behaviour
-    # intact for older versions of the script.
     R_MS=$(grep -m1 '^# R-call' "${r_out}.err" | awk '{print int($3)}')
     if [[ -z "${R_MS}" ]]; then
         R_MS="${ELAPSED_MS}"
     fi
 
-    # --- optional additional timing runs ---
     if (( RUNS > 1 )); then
         local cpp_total="${CPP_MS}" r_total="${R_MS}" i
         for ((i = 2; i <= RUNS; i++)); do
@@ -170,7 +152,6 @@ verify_file() {
         R_MS=$((r_total / RUNS))
     fi
 
-    # --- compare (comments ignored) ---
     strip_comments "${cpp_out}" "${cpp_out}.cmp"
     strip_comments "${r_out}"   "${r_out}.cmp"
 
@@ -207,7 +188,6 @@ verify_file() {
     read -r _ cpp_rows r_rows data_diffs label_diffs multi_diffs first_div \
         <<< "$(grep '^SUMMARY' "${report}")"
 
-    # multiset comparison of complete rows (order independent)
     local cpp_only r_only
     cpp_only="$(LC_ALL=C comm -23 <(LC_ALL=C sort "${cpp_out}.cmp") <(LC_ALL=C sort "${r_out}.cmp") | wc -l)"
     r_only="$(LC_ALL=C comm -13 <(LC_ALL=C sort "${cpp_out}.cmp") <(LC_ALL=C sort "${r_out}.cmp") | wc -l)"
@@ -218,16 +198,13 @@ verify_file() {
     else
         RESULT="FAIL"
         DETAIL="rows C++/R: ${cpp_rows}/${r_rows}, first divergence: line ${first_div}, data: ${data_diffs}, labels: ${label_diffs} (multi-label: ${multi_diffs}), C++-only: ${cpp_only}, R-only: ${r_only}"
-        # keep the detailed differences for the printout
         grep -v '^SUMMARY' "${report}" > "${TMP_DIR}/${test_name}.diffs"
     fi
 }
 
-# ---------------------------------------------------------------
-# Main loop
-# ---------------------------------------------------------------
+check_prerequisites
+
 n_ok=0; n_fail=0; n_error=0; n_skip=0
-declare -a SUMMARY_LINES=()
 
 echo "Data files: ${#FILES[@]}   Profiles: ${#PROFILES[@]}   (RUNS=${RUNS})"
 echo
@@ -245,23 +222,19 @@ for f in "${FILES[@]}"; do
         esac
 
         if [[ "${RESULT}" == "OK" || "${RESULT}" == "FAIL" ]]; then
-            line="$(printf '%-6s %-36s %s  [C++ %d ms, R %d ms]' \
-                    "${RESULT}" "${name} (${profile})" "${DETAIL}" "${CPP_MS}" "${R_MS}")"
+            printf '%-6s %-36s %s  [C++ %d ms, R %d ms]\n' \
+                "${RESULT}" "${name} (${profile})" "${DETAIL}" "${CPP_MS}" "${R_MS}"
         else
-            line="$(printf '%-6s %-36s %s' "${RESULT}" "${name} (${profile})" "${DETAIL}")"
+            printf '%-6s %-36s %s\n' \
+                "${RESULT}" "${name} (${profile})" "${DETAIL}"
         fi
-        SUMMARY_LINES+=("${line}")
 
-        echo "${line}"
         if [[ "${RESULT}" == "FAIL" && -s "${TMP_DIR}/${name}.${profile}.diffs" ]]; then
             cat "${TMP_DIR}/${name}.${profile}.diffs"
         fi
     done
 done
 
-# ---------------------------------------------------------------
-# Result
-# ---------------------------------------------------------------
 echo
 echo "========================================"
 echo "Verification result"
