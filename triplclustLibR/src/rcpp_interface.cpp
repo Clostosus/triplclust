@@ -10,8 +10,9 @@ Rcpp::List triplclust_rcpp(
     double s, bool s_dnn,
     double t, bool tauto,
     double dmax, bool dmax_dnn, bool is_dmax,
-    std::string linkage, int m, int verbose) {
+    std::string linkage, int m, int verbose, bool ordered) {
   PointCloud cloud;
+  cloud.setOrdered(ordered);
   for (int row = 0; row < points.nrow(); ++row) {
     cloud.push_back(Point(points(row, 0), points(row, 1), points(row, 2)));
   }

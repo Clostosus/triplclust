@@ -14,11 +14,12 @@
   }
 
   value <- trimws(value)
-  if (allow_none && identical(tolower(value), "none")) {
+  value_lower <- tolower(value)
+  if (allow_none && identical(value_lower, "none")) {
     return(list(value = 0, dnn = FALSE, enabled = FALSE))
   }
 
-  dnn <- endsWith(value, "dNN") || endsWith(value, "dnn")
+  dnn <- grepl("dnn$", value_lower)
   if (dnn) value <- substr(value, 1L, nchar(value) - 3L)
   value <- suppressWarnings(as.numeric(value))
   if (length(value) != 1L || is.na(value) || !is.finite(value)) {
@@ -50,20 +51,25 @@
 #' Cluster a 3D point cloud
 #'
 #' @param points Numeric matrix with exactly three columns (x, y, z).
-#' @param r Smoothing radius, as a number or a dNN-scaled string; defaults to
-#'   `2dNN`.
+#' @param r Smoothing radius. Accepts a finite numeric scalar, or a string such
+#'   as `"2"`, `"2dNN"`, or `"0.5dNN"`; defaults to `2dNN`.
 #' @param k Number of nearest neighbors used to generate candidate triplets.
 #' @param n Minimum number of neighbors used by triplet generation.
 #' @param a Collinearity tolerance in `(0, pi)`.
-#' @param s Distance scale for hierarchical clustering; defaults to `0.33dNN`.
-#' @param t Fixed clustering threshold or `"auto"` (default).
-#' @param tauto Optional override for automatic threshold selection. By
-#'   default, it is enabled for `t = "auto"` and disabled for numeric `t`.
-#' @param dmax Optional maximum gap for splitting clusters; accepts a number,
-#'   a dNN-scaled string, or `"none"`.
+#' @param s Distance scale for hierarchical clustering. Accepts a finite
+#'   numeric scalar, or a string such as `"0.33"`, `"0.33dNN"`, or
+#'   `"1.5dNN"`; defaults to `0.33dNN`.
+#' @param t Clustering threshold. Accepts a finite non-negative numeric value,
+#'   or the case-insensitive strings `"auto"` / `"automatic"` to let the
+#'   algorithm choose it.
+#' @param dmax Optional maximum gap for splitting clusters. Accepts a finite
+#'   numeric scalar, a dNN-scaled string such as `"2.5dNN"` (case-insensitive
+#'   suffix), or `"none"`.
 #' @param linkage Linkage method: `"single"`, `"complete"`, or `"average"`.
 #' @param m Minimum cluster size retained by pruning.
 #' @param verbose Verbosity level for diagnostic output.
+#' @param ordered Logical flag. If `TRUE`, treat the input as an ordered point
+#'   sequence, matching the CLI `-ordered` option.
 #' @return A list of integer vectors containing the 1-based row indices for
 #'   each cluster. A point may occur in more than one cluster.
 #' @examples
@@ -87,8 +93,9 @@
 #' }
 #' @export
 triplclust <- function(points, r = NULL, k = 19L, n = 2L, a = 0.03,
-                       s = NULL, t = "auto", tauto = NULL, dmax = NULL,
-                       linkage = "single", m = 5L, verbose = 0L) {
+                       s = NULL, t = "auto", dmax = NULL,
+                       linkage = "single", m = 5L, verbose = 0L,
+                       ordered = FALSE) {
   if (!is.matrix(points) || !is.numeric(points) || ncol(points) != 3L) {
     stop("points must be a numeric matrix with exactly three columns",
          call. = FALSE)
@@ -124,12 +131,11 @@ triplclust <- function(points, r = NULL, k = 19L, n = 2L, a = 0.03,
     t <- 0
   } else {
     t <- .parse_number(t, "t")
+    if (t < 0) stop("t must be non-negative", call. = FALSE)
   }
-  if (is.null(tauto)) tauto <- automatic
-  if (!is.logical(tauto) || length(tauto) != 1L || is.na(tauto)) {
-    stop("tauto must be TRUE or FALSE", call. = FALSE)
+  if (!is.logical(ordered) || length(ordered) != 1L || is.na(ordered)) {
+    stop("ordered must be TRUE or FALSE", call. = FALSE)
   }
-  if (!tauto && t < 0) stop("t must be non-negative", call. = FALSE)
 
   valid_linkage <- is.character(linkage) && length(linkage) == 1L &&
     is.null(dim(linkage)) && !is.na(linkage) &&
@@ -140,8 +146,8 @@ triplclust <- function(points, r = NULL, k = 19L, n = 2L, a = 0.03,
 
   triplclust_rcpp( # nolint: object_usage_linter
     points, r$value, r$dnn, k, n, a,
-    s$value, s$dnn, t, tauto,
+    s$value, s$dnn, t, automatic,
     dmax$value, dmax$dnn, dmax$enabled,
-    linkage, m, verbose
+    linkage, m, verbose, ordered
   )
 }
