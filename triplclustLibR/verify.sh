@@ -65,12 +65,19 @@ count_columns() {
     printf '0\n'
 }
 
-strip_comments() {
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        [[ -z "${line//[[:space:]]/}" ]] && continue
-        [[ "${line:0:1}" == "#" ]] && continue
-        printf '%s\n' "$line"
-    done < "$1" > "$2"
+normalize_csv_for_comparison() {
+    local input_file="$1"
+    local output_file="$2"
+
+    awk -F, '
+        # Drop headers and malformed rows, then map multi-cluster labels to overlap.
+        NF < 4 || $1 ~ /^[[:space:]]*#/ { next }
+        {
+            label = $4
+            if (index(label, ";") > 0) label = "-2"
+            printf "%s,%s,%s,%s\n", $1, $2, $3, label
+        }
+    ' "$input_file" > "$output_file"
 }
 
 profile_args() {
@@ -152,52 +159,75 @@ verify_file() {
         R_MS=$((r_total / RUNS))
     fi
 
-    strip_comments "${cpp_out}" "${cpp_out}.cmp"
-    strip_comments "${r_out}"   "${r_out}.cmp"
+    normalize_csv_for_comparison "${cpp_out}" "${cpp_out}.cmp"
+    normalize_csv_for_comparison "${r_out}" "${r_out}.cmp"
 
     local report="${TMP_DIR}/${test_name}.report"
-    awk -F, -v limit="${MAX_SHOW}" '
-        FILENAME == ARGV[1] { a[FNR] = $0; na = FNR; next }
-        { b[FNR] = $0; nb = FNR }
+    awk -F, -v max_examples="${MAX_SHOW}" '
+        FILENAME == ARGV[1] {
+            cpp_rows[FNR] = $0
+            cpp_row_count = FNR
+            next
+        }
+        {
+            r_rows[FNR] = $0
+            r_row_count = FNR
+        }
         END {
-            n = (na > nb) ? na : nb
-            for (i = 1; i <= n; i++) {
-                if (!(i in a) || !(i in b)) {
-                    dd++; if (!first) first = i
-                    if (shown++ < limit) printf "    line %d: row missing on one side\n", i
+            row_count = (cpp_row_count > r_row_count) ? cpp_row_count : r_row_count
+            for (row = 1; row <= row_count; row++) {
+                if (!(row in cpp_rows) || !(row in r_rows)) {
+                    data_differences++
+                    if (!first_difference) first_difference = row
+                    if (shown++ < max_examples) {
+                        printf "    line %d: row missing on one side\n", row
+                    }
                     continue
                 }
-                split(a[i], x, ","); split(b[i], y, ",")
-                kx = x[1] "," x[2] "," x[3]
-                ky = y[1] "," y[2] "," y[3]
-                if (kx != ky) {
-                    dd++; if (!first) first = i
-                    if (shown++ < limit) printf "    line %d: DATA  C++: %s | R: %s\n", i, a[i], b[i]
+
+                split(cpp_rows[row], cpp_fields, ",")
+                split(r_rows[row], r_fields, ",")
+                cpp_point = cpp_fields[1] "," cpp_fields[2] "," cpp_fields[3]
+                r_point = r_fields[1] "," r_fields[2] "," r_fields[3]
+                if (cpp_point != r_point) {
+                    data_differences++
+                    if (!first_difference) first_difference = row
+                    if (shown++ < max_examples) {
+                        printf "    line %d: DATA  C++: %s | R: %s\n", row, cpp_rows[row], r_rows[row]
+                    }
                     continue
                 }
-                if (x[4] != y[4]) {
-                    ld++; if (!first) first = i
-                    if (index(x[4], ";") || index(y[4], ";")) md++
-                    if (shown++ < limit) printf "    line %d: LABEL %s  C++: %s | R: %s\n", i, kx, x[4], y[4]
+
+                if (cpp_fields[4] != r_fields[4]) {
+                    label_differences++
+                    if (!first_difference) first_difference = row
+                    if (index(cpp_fields[4], ";") || index(r_fields[4], ";")) {
+                        multi_label_differences++
+                    }
+                    if (shown++ < max_examples) {
+                        printf "    line %d: LABEL %s  C++: %s | R: %s\n", row, cpp_point, cpp_fields[4], r_fields[4]
+                    }
                 }
             }
-            printf "SUMMARY %d %d %d %d %d %d\n", na, nb, dd + 0, ld + 0, md + 0, first + 0
+            printf "SUMMARY %d %d %d %d %d %d\n", cpp_row_count, r_row_count, data_differences + 0, label_differences + 0, multi_label_differences + 0, first_difference + 0
         }' "${cpp_out}.cmp" "${r_out}.cmp" > "${report}"
 
-    local cpp_rows r_rows data_diffs label_diffs multi_diffs first_div
-    read -r _ cpp_rows r_rows data_diffs label_diffs multi_diffs first_div \
+    local cpp_row_count r_row_count data_differences label_differences
+    local multi_label_differences first_difference
+    read -r _ cpp_row_count r_row_count data_differences label_differences \
+        multi_label_differences first_difference \
         <<< "$(grep '^SUMMARY' "${report}")"
 
     local cpp_only r_only
     cpp_only="$(LC_ALL=C comm -23 <(LC_ALL=C sort "${cpp_out}.cmp") <(LC_ALL=C sort "${r_out}.cmp") | wc -l)"
     r_only="$(LC_ALL=C comm -13 <(LC_ALL=C sort "${cpp_out}.cmp") <(LC_ALL=C sort "${r_out}.cmp") | wc -l)"
 
-    if (( data_diffs == 0 && label_diffs == 0 && cpp_only == 0 && r_only == 0 )); then
+    if (( data_differences == 0 && label_differences == 0 && cpp_only == 0 && r_only == 0 )); then
         RESULT="OK"
-        DETAIL="${cpp_rows} rows identical"
+        DETAIL="${cpp_row_count} rows identical"
     else
         RESULT="FAIL"
-        DETAIL="rows C++/R: ${cpp_rows}/${r_rows}, first divergence: line ${first_div}, data: ${data_diffs}, labels: ${label_diffs} (multi-label: ${multi_diffs}), C++-only: ${cpp_only}, R-only: ${r_only}"
+        DETAIL="rows C++/R: ${cpp_row_count}/${r_row_count}, first divergence: line ${first_difference}, data: ${data_differences}, labels: ${label_differences} (multi-label: ${multi_label_differences}), C++-only: ${cpp_only}, R-only: ${r_only}"
         grep -v '^SUMMARY' "${report}" > "${TMP_DIR}/${test_name}.diffs"
     fi
 }

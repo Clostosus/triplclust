@@ -13,15 +13,12 @@ prepare_plot <- function(points, labels) {
     )
   }
 
-  cluster_list <- .prepare_plot_labels(points, labels)
-  membership_counts <- tabulate(
-    unlist(lapply(cluster_list, unique), use.names = FALSE),
-    nbins = nrow(points)
-  )
-  non_clustered <- which(membership_counts == 0L)
-  overlap_ids <- which(membership_counts > 1L)
-  cluster_indices <- lapply(cluster_list, function(indices) {
-    setdiff(unique(indices), overlap_ids)
+  export_data <- .prepare_export_data(points, labels)
+  cluster_indices <- export_data$clusters
+  overlap_ids <- export_data$overlap_ids
+  non_clustered <- export_data$unassigned_ids
+  cluster_indices <- lapply(cluster_indices, function(indices) {
+    setdiff(indices, overlap_ids)
   })
   cluster_numbers <- which(lengths(cluster_indices) > 0L)
   cluster_indices <- cluster_indices[cluster_numbers]

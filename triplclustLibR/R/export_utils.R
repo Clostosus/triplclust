@@ -26,6 +26,24 @@
        call. = FALSE)
 }
 
+.prepare_export_data <- function(points, labels) {
+  clusters <- lapply(.prepare_plot_labels(points, labels), unique)
+  point_clusters <- split(
+    rep.int(seq_along(clusters), lengths(clusters)),
+    unlist(clusters, use.names = FALSE)
+  )
+  cluster_counts <- sapply(point_clusters, length)
+  overlap_ids <- as.integer(names(cluster_counts)[cluster_counts > 1L])
+  assigned_ids <- as.integer(names(point_clusters))
+
+  list(
+    clusters = clusters,
+    point_clusters = point_clusters,
+    overlap_ids = overlap_ids,
+    unassigned_ids = setdiff(seq_len(nrow(points)), assigned_ids)
+  )
+}
+
 .plot_colour_hex <- function(cluster_index) {
   idx <- as.integer(cluster_index)
   red <- ((idx * 23L) %% 19L) / 18
