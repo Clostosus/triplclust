@@ -2,7 +2,8 @@
 #'
 #' @param points Numeric matrix with exactly three columns (x, y, z).
 #' @param labels Either a list of integer vectors returned by
-#'   \code{triplclust()} or a per-point integer vector.
+#'   \code{triplclust()} or a per-point integer vector. In a per-point vector,
+#'   `-1` marks noise and `-2` marks overlap.
 #' @return A character string containing a gnuplot script.
 #' @export
 prepare_plot <- function(points, labels) {

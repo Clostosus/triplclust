@@ -27,20 +27,38 @@
 }
 
 .prepare_export_data <- function(points, labels) {
-  clusters <- lapply(.prepare_plot_labels(points, labels), unique)
+  clusters <- .prepare_plot_labels(points, labels)
+  overlap_ids <- noise_ids <- integer(0)
+
+  if (!is.list(labels) && any(as.integer(labels) < 0L, na.rm = TRUE)) {
+    point_labels <- as.integer(labels)
+    point_labels[is.na(point_labels)] <- 0L
+    overlap_ids <- which(point_labels == -2L)
+    noise_ids <- which(point_labels == -1L)
+    assigned_ids <- which(point_labels >= 0L)
+    clusters <- split(assigned_ids, point_labels[assigned_ids])
+  }
+
+  clusters <- lapply(clusters, unique)
   point_clusters <- split(
     rep.int(seq_along(clusters), lengths(clusters)),
     unlist(clusters, use.names = FALSE)
   )
-  cluster_counts <- sapply(point_clusters, length)
-  overlap_ids <- as.integer(names(cluster_counts)[cluster_counts > 1L])
-  assigned_ids <- as.integer(names(point_clusters))
+  memberships <- sapply(point_clusters, length)
+  overlap_ids <- sort(unique(c(
+    overlap_ids,
+    as.integer(names(memberships)[memberships > 1L])
+  )))
+  assigned_ids <- c(as.integer(names(point_clusters)), overlap_ids)
 
   list(
     clusters = clusters,
     point_clusters = point_clusters,
     overlap_ids = overlap_ids,
-    unassigned_ids = setdiff(seq_len(nrow(points)), assigned_ids)
+    unassigned_ids = union(
+      noise_ids,
+      setdiff(seq_len(nrow(points)), assigned_ids)
+    )
   )
 }
 
