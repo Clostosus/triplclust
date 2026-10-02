@@ -3,33 +3,47 @@
 R package providing an interface to the **TriplClust** algorithm for 3D point-cloud clustering.
 
 ## Build
-Using `makecrandist.sh` generates a tar.gz file containing the package.
+From the repository root, build the source tarball with:
+
+```sh
+./triplclustLibR/makecrandist.sh
+```
+
+The tarball is written to `triplclustLibR/`.
 
 ## Installation
-To install the package in R without CRAN, you need the tarball(tar.gz) of the package.
+From the repository root, install the generated tarball with:
 
-```
-install.packages("pathtofile/triplclust_1.0.0.tar.gz",
+```r
+install.packages("triplclustLibR/triplclust_1.0.1.tar.gz",
                  repos = NULL, type = "source")
 ```
 
 ## Verification
-In case you cloned the repository, use `verify.sh`.
-For a less extensive verification use the R Scripts from `inst/scripts` that use the triplclust R-function.
+After building the C++ executable and installing the R package, run from the
+repository root:
+
+```sh
+./triplclustLibR/verify.sh
+```
+
+To generate a gnuplot script and display the bundled data:
+
+```sh
+Rscript triplclustLibR/inst/scripts/use_triplclust.R data/attpc.dat -gnuplot | gnuplot --persist
+```
 
 ## Basic usage
-The function accepts an `n x 3` numeric matrix and returns one integer cluster
-label per input point; `0` denotes a point that was not assigned to a
-cluster.
+The function accepts an `n x 3` numeric matrix and returns a list of clusters.
+Each list element contains the 1-based row indices of its points. A point may
+occur in multiple clusters; points absent from every cluster are unassigned.
 
-```R
-    library(triplclustLibR)
+```r
+library(triplclust)
 
-    ## generate a small random point cloud (n x 3 matrix)
-    pts <- matrix(rnorm(30), ncol = 3)
+data("attpc", package = "triplclust")
+points <- as.matrix(attpc)
+clusters <- triplclust(points)
 
-    ## run the clustering function
-     cls <- triplclust(pts)
-
-    head(cls)   # shows the first few cluster labels (0 = unassigned)
+lengths(clusters)  # number of points in each cluster
 ```
