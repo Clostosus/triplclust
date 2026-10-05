@@ -34,9 +34,10 @@ Rscript triplclustLibR/inst/scripts/use_triplclust.R data/attpc.dat -gnuplot | g
 ```
 
 ## Basic usage
-The function accepts an `n x 3` numeric matrix and returns a list of clusters.
-Each list element contains the 1-based row indices of its points. A point may
-occur in multiple clusters; points absent from every cluster are unassigned.
+The function accepts an `n x 3` numeric matrix and returns a point-indexed
+list. Each list element contains the 1-based IDs of the clusters containing
+that point; an empty element means the point is unassigned. A point can belong
+to multiple clusters.
 
 ```r
 library(triplclust)
@@ -45,5 +46,5 @@ data("attpc", package = "triplclust")
 points <- as.matrix(attpc)
 clusters <- triplclust(points)
 
-lengths(clusters)  # number of points in each cluster
+clusters[[1]]      # cluster IDs containing the first point
 ```

@@ -20,21 +20,21 @@
 #' @param verbose Verbosity level for diagnostic output.
 #' @param ordered Logical flag. If `TRUE`, treat the input as an ordered point
 #'   sequence, matching the CLI `-ordered` option.
-#' @return A list of integer vectors containing the 1-based row indices for
-#'   each cluster. A point may occur in more than one cluster.
+#' @return A list with one integer vector per input point. Each vector contains
+#'   the 1-based IDs of the clusters containing that point; unassigned points
+#'   have an empty vector.
 #' @examples
 #' \dontrun{
 #' data("attpc", package = "triplclust")
 #' points <- as.matrix(attpc)
 #' clusters <- triplclust(points)
 #'
-#' cluster_id <- rep(NA_integer_, nrow(points))
-#' for (i in seq_along(clusters)) {
-#'   cluster_id[clusters[[i]]] <- i
-#' }
+#' cluster_id <- vapply(clusters, function(ids) {
+#'   if (length(ids) == 0L) NA_integer_ else ids[[1L]]
+#' }, integer(1))
 #' point_colors <- rep("grey70", nrow(points))
 #' assigned <- !is.na(cluster_id)
-#' palette <- grDevices::rainbow(max(1L, length(clusters)))
+#' palette <- grDevices::rainbow(max(1L, unlist(clusters)))
 #' point_colors[assigned] <- palette[cluster_id[assigned]]
 #'
 #' rgl::open3d()

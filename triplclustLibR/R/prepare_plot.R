@@ -1,7 +1,7 @@
 #' Convert cluster assignments to gnuplot script text
 #'
 #' @param points Numeric matrix with exactly three columns (x, y, z).
-#' @param labels Either a list of integer vectors returned by
+#' @param labels Either the point-indexed list returned by
 #'   \code{triplclust()} or a per-point integer vector. In a per-point vector,
 #'   `-1` marks noise and `-2` marks overlap.
 #' @return A character string containing a gnuplot script.
@@ -15,14 +15,14 @@ prepare_plot <- function(points, labels) {
   }
 
   export_data <- .prepare_export_data(points, labels)
-  cluster_indices <- export_data$clusters
+  cluster_indices <- lapply(export_data$clusters, function(indices) {
+    setdiff(indices, export_data$overlap_ids)
+  })
   overlap_ids <- export_data$overlap_ids
   non_clustered <- export_data$unassigned_ids
-  cluster_indices <- lapply(cluster_indices, function(indices) {
-    setdiff(indices, overlap_ids)
-  })
-  cluster_numbers <- which(lengths(cluster_indices) > 0L)
-  cluster_indices <- cluster_indices[cluster_numbers]
+  keep_clusters <- lengths(cluster_indices) > 0L
+  cluster_numbers <- export_data$cluster_ids[keep_clusters]
+  cluster_indices <- cluster_indices[keep_clusters]
 
   axis_names <- c("x", "y", "z")
   axis_min <- apply(points, 2, min)
@@ -59,7 +59,7 @@ prepare_plot <- function(points, labels) {
   cluster_series <- if (length(cluster_numbers) > 0L) {
     paste0(
       "'-' with points lc '", cluster_colours,
-      "' title 'curve ", cluster_numbers, "'"
+      "' title 'curve ", cluster_numbers - 1L, "'"
     )
   } else {
     character(0)

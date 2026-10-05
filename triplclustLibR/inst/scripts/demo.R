@@ -46,8 +46,12 @@ res <- triplclust(
 )
 
 cat("\n--- Result ------------------------------------------------\n")
-cat("Number of clusters found :", length(res), "\n")
-if (length(res) > 0) {
-  cat("Size of each cluster       :", sapply(res, length), "\n")
+cluster_ids <- sort(unique(unlist(res, use.names = FALSE)))
+cat("Number of clusters found :", length(cluster_ids), "\n")
+if (length(cluster_ids) > 0L) {
+  cluster_sizes <- vapply(cluster_ids, function(cluster_id) {
+    sum(vapply(res, function(ids) cluster_id %in% ids, logical(1)))
+  }, integer(1))
+  cat("Points in each cluster    :", cluster_sizes, "\n")
 }
 cat("--- End of demo -------------------------------------------\n")
