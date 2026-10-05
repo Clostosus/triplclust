@@ -6,6 +6,8 @@
 #
 #  Everything happens in a temporary directory, so the
 #  repository itself is never modified.
+#
+#  Depends on: R, Rcpp, roxygen2
 # -------------------------------------------------------------
 set -euo pipefail
 

@@ -1,53 +1,3 @@
-.parse_distance <- function(value, name, default, default_dnn = FALSE,
-                            allow_none = FALSE) {
-  if (is.null(value)) {
-    return(list(value = default, dnn = default_dnn,
-                enabled = !allow_none))
-  }
-  if (is.numeric(value) && length(value) == 1L && is.null(dim(value))) {
-    value <- as.double(value)
-    if (!is.finite(value)) stop(name, " must be finite", call. = FALSE)
-    return(list(value = value, dnn = FALSE, enabled = TRUE))
-  }
-  if (!is.character(value) || length(value) != 1L || is.na(value)) {
-    stop(name, " must be a scalar number or dNN string", call. = FALSE)
-  }
-
-  value <- trimws(value)
-  value_lower <- tolower(value)
-  if (allow_none && identical(value_lower, "none")) {
-    return(list(value = 0, dnn = FALSE, enabled = FALSE))
-  }
-
-  dnn <- grepl("dnn$", value_lower)
-  if (dnn) value <- substr(value, 1L, nchar(value) - 3L)
-  value <- suppressWarnings(as.numeric(value))
-  if (length(value) != 1L || is.na(value) || !is.finite(value)) {
-    stop(name, " must be a finite number, optionally followed by dNN",
-         call. = FALSE)
-  }
-  list(value = value, dnn = dnn, enabled = TRUE)
-}
-
-.parse_integer <- function(value, name, minimum) {
-  valid <- is.numeric(value) && length(value) == 1L &&
-    is.null(dim(value)) && is.finite(value) && value == floor(value) &&
-    value >= minimum && value <= .Machine$integer.max
-  if (!valid) {
-    stop(name, " must be an integer >= ", minimum, call. = FALSE)
-  }
-  as.integer(value)
-}
-
-.parse_number <- function(value, name) {
-  valid <- is.numeric(value) && length(value) == 1L &&
-    is.null(dim(value)) && is.finite(value)
-  if (!valid) {
-    stop(name, " must be a finite scalar number", call. = FALSE)
-  }
-  as.double(value)
-}
-
 #' Cluster a 3D point cloud
 #'
 #' @param points Numeric matrix with exactly three columns (x, y, z).
@@ -150,4 +100,54 @@ triplclust <- function(points, r = NULL, k = 19L, n = 2L, a = 0.03,
     dmax$value, dmax$dnn, dmax$enabled,
     linkage, m, verbose, ordered
   )
+}
+
+.parse_distance <- function(value, name, default, default_dnn = FALSE,
+                            allow_none = FALSE) {
+  if (is.null(value)) {
+    return(list(value = default, dnn = default_dnn,
+                enabled = !allow_none))
+  }
+  if (is.numeric(value) && length(value) == 1L && is.null(dim(value))) {
+    value <- as.double(value)
+    if (!is.finite(value)) stop(name, " must be finite", call. = FALSE)
+    return(list(value = value, dnn = FALSE, enabled = TRUE))
+  }
+  if (!is.character(value) || length(value) != 1L || is.na(value)) {
+    stop(name, " must be a scalar number or dNN string", call. = FALSE)
+  }
+
+  value <- trimws(value)
+  value_lower <- tolower(value)
+  if (allow_none && identical(value_lower, "none")) {
+    return(list(value = 0, dnn = FALSE, enabled = FALSE))
+  }
+
+  dnn <- grepl("dnn$", value_lower)
+  if (dnn) value <- substr(value, 1L, nchar(value) - 3L)
+  value <- suppressWarnings(as.numeric(value))
+  if (length(value) != 1L || is.na(value) || !is.finite(value)) {
+    stop(name, " must be a finite number, optionally followed by dNN",
+         call. = FALSE)
+  }
+  list(value = value, dnn = dnn, enabled = TRUE)
+}
+
+.parse_integer <- function(value, name, minimum) {
+  valid <- is.numeric(value) && length(value) == 1L &&
+    is.null(dim(value)) && is.finite(value) && value == floor(value) &&
+    value >= minimum && value <= .Machine$integer.max
+  if (!valid) {
+    stop(name, " must be an integer >= ", minimum, call. = FALSE)
+  }
+  as.integer(value)
+}
+
+.parse_number <- function(value, name) {
+  valid <- is.numeric(value) && length(value) == 1L &&
+    is.null(dim(value)) && is.finite(value)
+  if (!valid) {
+    stop(name, " must be a finite scalar number", call. = FALSE)
+  }
+  as.double(value)
 }
