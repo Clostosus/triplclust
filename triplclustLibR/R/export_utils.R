@@ -4,29 +4,46 @@
       stop("labels must have one element per point", call. = FALSE)
     }
     point_clusters <- lapply(labels, function(ids) {
-      if (!is.numeric(ids) || anyNA(ids) || any(!is.finite(ids)) ||
-          any(ids != floor(ids)) || any(ids < 1L)) {
-        stop("each point's cluster IDs must be positive integers",
+      if (!is.numeric(ids)) {
+        stop("each point's cluster IDs must be numeric", call. = FALSE)
+      }
+      if (anyNA(ids)) {
+        stop("each point's cluster IDs must not contain missing values",
              call. = FALSE)
+      }
+      if (any(!is.finite(ids))) {
+        stop("each point's cluster IDs must be finite", call. = FALSE)
+      }
+      if (any(ids != floor(ids))) {
+        stop("each point's cluster IDs must be integers", call. = FALSE)
+      }
+      if (any(ids < 1L)) {
+        stop("each point's cluster IDs must be positive", call. = FALSE)
       }
       unique(as.integer(ids))
     })
-    special_overlap_ids <- integer(0)
-  } else if (is.numeric(labels) || is.integer(labels) ||
-             is.character(labels)) {
+  } else {
+    if (!is.numeric(labels)) {
+      if (!is.character(labels)) {
+        stop("labels must be a point-indexed list or a per-point label vector",
+             call. = FALSE)
+      }
+    }
     point_labels <- suppressWarnings(as.integer(labels))
-    if (length(point_labels) != nrow(points) || anyNA(point_labels) ||
-        any(point_labels < -2L)) {
-      stop("labels must have one valid cluster label per point",
+    if (length(point_labels) != nrow(points)) {
+      stop("labels must have one value per point", call. = FALSE)
+    }
+    if (anyNA(point_labels)) {
+      stop("labels must contain valid integer cluster labels",
            call. = FALSE)
     }
-    special_overlap_ids <- which(point_labels == -2L)
+    if (any(point_labels < -1L)) {
+      stop("labels must be -1 for noise or non-negative cluster IDs",
+           call. = FALSE)
+    }
     point_clusters <- lapply(point_labels, function(id) {
-      if (id < 0L) integer(0) else id + 1L
+      if (id == -1L) integer(0) else id + 1L
     })
-  } else {
-    stop("labels must be a point-indexed list or a per-point label vector",
-         call. = FALSE)
   }
 
   cluster_ids <- sort(unique(unlist(point_clusters, use.names = FALSE)))
@@ -35,12 +52,8 @@
                  logical(1)))
   })
   names(clusters) <- as.character(cluster_ids)
-  overlap_ids <- sort(unique(c(
-    special_overlap_ids,
-    which(lengths(point_clusters) > 1L)
-  )))
-  unassigned_ids <- setdiff(which(lengths(point_clusters) == 0L),
-                            special_overlap_ids)
+  overlap_ids <- which(lengths(point_clusters) > 1L)
+  unassigned_ids <- which(lengths(point_clusters) == 0L)
 
   list(
     clusters = clusters,

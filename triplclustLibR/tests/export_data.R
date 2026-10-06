@@ -15,7 +15,8 @@ run_export <- function(arguments) {
     stdout = TRUE,
     stderr = stderr_file
   )
-  stopifnot(is.null(attr(output, "status")) || attr(output, "status") == 0L)
+  status <- attr(output, "status")
+  if (!is.null(status)) stopifnot(status == 0L)
   output
 }
 

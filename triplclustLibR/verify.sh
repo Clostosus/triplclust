@@ -70,12 +70,14 @@ normalize_csv_for_comparison() {
     local output_file="$2"
 
     awk -F, '
-        # Drop headers and malformed rows, then map multi-cluster labels to overlap.
+        # Drop headers and malformed rows while preserving all cluster IDs.
         NF < 4 || $1 ~ /^[[:space:]]*#/ { next }
         {
+            x = $1
+            y = $2
+            z = $3
             label = $4
-            if (index(label, ";") > 0) label = "-2"
-            printf "%s,%s,%s,%s\n", $1, $2, $3, label
+            printf "%s,%s,%s,%s\n", x, y, z, label
         }
     ' "$input_file" > "$output_file"
 }

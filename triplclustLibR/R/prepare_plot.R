@@ -3,15 +3,19 @@
 #' @param points Numeric matrix with exactly three columns (x, y, z).
 #' @param labels Either the point-indexed list returned by
 #'   \code{triplclust()} or a per-point integer vector. In a per-point vector,
-#'   `-1` marks noise and `-2` marks overlap.
-#' @return A character string containing a gnuplot script.
+#'   `-1` marks noise and non-negative values are zero-based cluster IDs.
+#' @return A character string containing a gnuplot script. Points with multiple
+#'   cluster memberships are shown in a separate overlap series.
 #' @export
 prepare_plot <- function(points, labels) {
-  if (!is.matrix(points) || !is.numeric(points) || ncol(points) != 3L) {
-    stop(
-      "points must be a numeric matrix with exactly three columns",
-      call. = FALSE
-    )
+  if (!is.matrix(points)) {
+    stop("points must be a matrix", call. = FALSE)
+  }
+  if (!is.numeric(points)) {
+    stop("points must be numeric", call. = FALSE)
+  }
+  if (ncol(points) != 3L) {
+    stop("points must have exactly three columns", call. = FALSE)
   }
 
   export_data <- .prepare_export_data(points, labels)

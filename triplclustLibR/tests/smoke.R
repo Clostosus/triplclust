@@ -21,12 +21,21 @@ stopifnot(length(default_result) == nrow(points),
 example_memberships <- list(c(1L, 2L), integer(), 2L)
 example_points <- matrix(as.numeric(1:9), ncol = 3)
 csv <- prepare_csv(example_points, example_memberships)
-stopifnot(grepl("1.000000,4.000000,7.000000,-2", csv, fixed = TRUE),
+stopifnot(grepl("1.000000,4.000000,7.000000,0;1", csv, fixed = TRUE),
           grepl("2.000000,5.000000,8.000000,-1", csv, fixed = TRUE),
           grepl("3.000000,6.000000,9.000000,1", csv, fixed = TRUE))
 plot <- prepare_plot(example_points, example_memberships)
+multi_member_point <- "1.00000000 4.00000000 7.00000000"
 stopifnot(grepl("title 'curve 1'", plot, fixed = TRUE),
-          grepl("title 'overlap'", plot, fixed = TRUE))
+          grepl("title 'overlap'", plot, fixed = TRUE),
+          length(regmatches(plot, gregexpr(multi_member_point, plot,
+                                           fixed = TRUE))[[1]]) == 1L)
+
+invalid_overlap_label <- tryCatch({
+  prepare_csv(example_points, c(0L, -1L, -2L))
+  FALSE
+}, error = function(error) TRUE)
+stopifnot(invalid_overlap_label)
 
 invalid_points <- matrix(as.numeric(1:4), ncol = 2)
 rejected <- tryCatch({
