@@ -8,16 +8,9 @@
 #'   IDs for overlaps.
 #' @export
 prepare_csv <- function(points, labels) {
-  export_data <- .prepare_export_data(points, labels)
-  n_points <- nrow(points)
-  point_labels <- rep("0", n_points)
-
-  if (length(export_data$point_clusters) > 0L) {
-    point_labels[as.integer(names(export_data$point_clusters))] <-
-      vapply(export_data$point_clusters, function(cluster_ids) {
-        paste(cluster_ids, collapse = ";")
-      }, character(1))
-  }
+  point_labels <- vapply(labels, function(ids) {
+    if (length(ids) == 1L && ids[1] == 0L) "0" else paste(ids, collapse = ";")
+  }, character(1))
 
   rows <- paste(formatC(points[, 1], digits = 6, format = "f"),
     formatC(points[, 2], digits = 6, format = "f"),
@@ -41,13 +34,45 @@ prepare_csv <- function(points, labels) {
 #' @return A character string containing a gnuplot script.
 #' @export
 prepare_plot <- function(points, labels) {
-  export_data <- .prepare_export_data(points, labels)
-  cluster_indices <- export_data$clusters
-  overlap_ids <- export_data$overlap_ids
-  non_clustered <- export_data$unassigned_ids
-  cluster_indices <- lapply(cluster_indices, function(indices) {
-    setdiff(indices, overlap_ids)
-  })
+  n_points <- nrow(points)
+
+  noise_ids <- integer(0)
+  overlap_ids <- integer(0)
+  clusters <- list()
+
+  # Convert points[cluster_ids[]] -> clusters[point_ids[]] for gnuplot
+  for (i in seq_len(n_points)) {
+    ids <- labels[[i]]
+    if (length(ids) == 1L) {
+      cid <- ids[1]
+      if (cid == 0L) {
+        noise_ids <- c(noise_ids, i)
+      } else if (cid >= 0L) {
+        cluster_idx <- cid + 1L
+        if (cluster_idx > length(clusters)) length(clusters) <- cluster_idx
+        if (is.null(clusters[[cluster_idx]]))
+          clusters[[cluster_idx]] <- integer(0)
+        clusters[[cluster_idx]] <- c(clusters[[cluster_idx]], i)
+      }
+      next
+    }
+    if (length(ids) > 1L) {
+      overlap_ids <- c(overlap_ids, i)
+    }
+    for (cid in ids) {
+      if (cid < 0L) next
+      cluster_idx <- cid + 1L
+      if (cluster_idx > length(clusters)) length(clusters) <- cluster_idx
+      if (is.null(clusters[[cluster_idx]])) clusters[[cluster_idx]] <- integer(0)
+      clusters[[cluster_idx]] <- c(clusters[[cluster_idx]], i)
+    }
+  }
+
+  clusters <- clusters[!vapply(clusters, is.null, logical(1))]
+  clusters <- lapply(clusters, unique)
+
+  cluster_indices <- lapply(clusters,
+                            function(indices) setdiff(indices, overlap_ids))
   cluster_numbers <- which(lengths(cluster_indices) > 0L)
   cluster_indices <- cluster_indices[cluster_numbers]
 
@@ -71,13 +96,13 @@ prepare_plot <- function(points, labels) {
     c(paste(formatted_points[indices], collapse = "\n"), "e")
   }
 
-  noise_series <- if (length(non_clustered) > 0L) {
+  noise_series <- if (length(noise_ids) > 0L) {
     "'-' with points lc 'red' title 'noise'"
   } else {
     character(0)
   }
-  noise_blocks <- if (length(non_clustered) > 0L) {
-    points_block(non_clustered)
+  noise_blocks <- if (length(noise_ids) > 0L) {
+    points_block(noise_ids)
   } else {
     character(0)
   }
@@ -117,53 +142,6 @@ prepare_plot <- function(points, labels) {
     "pause mouse keypress"
   )
   paste(script, collapse = "\n")
-}
-
-.prepare_export_data <- function(points, labels) {
-  n_points <- nrow(points)
-
-  cluster_ids_list <- labels
-  noise_ids <- integer(0)
-  overlap_ids <- integer(0)
-  clusters <- list()
-
-  for (i in seq_len(n_points)) {
-    ids <- cluster_ids_list[[i]]
-    if (length(ids) == 1L && ids[1] == 0L) {
-      noise_ids <- c(noise_ids, i)
-    } else {
-      if (length(ids) > 1L) {
-        overlap_ids <- c(overlap_ids, i)
-      }
-      for (cid in ids) {
-        if (cid >= 0L) {
-          cluster_idx <- cid + 1L
-          if (cluster_idx > length(clusters)) {
-            length(clusters) <- cluster_idx
-          }
-          if (is.null(clusters[[cluster_idx]])) {
-            clusters[[cluster_idx]] <- integer(0)
-          }
-          clusters[[cluster_idx]] <- c(clusters[[cluster_idx]], i)
-        }
-      }
-    }
-  }
-
-  clusters <- clusters[!vapply(clusters, is.null, logical(1))]
-  clusters <- lapply(clusters, unique)
-
-  point_clusters <- split(
-    rep.int(seq_along(clusters), lengths(clusters)),
-    unlist(clusters, use.names = FALSE)
-  )
-
-  list(
-    clusters = clusters,
-    point_clusters = point_clusters,
-    overlap_ids = sort(overlap_ids),
-    unassigned_ids = noise_ids
-  )
 }
 
 .plot_colour_hex <- function(cluster_index) {
