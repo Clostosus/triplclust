@@ -20,21 +20,25 @@
 #' @param verbose Verbosity level for diagnostic output.
 #' @param ordered Logical flag. If `TRUE`, treat the input as an ordered point
 #'   sequence, matching the CLI `-ordered` option.
-#' @return A list of integer vectors containing the 1-based row indices for
-#'   each cluster. A point may occur in more than one cluster.
+#' @return A list of integer vectors of length \code{nrow(points)}.
+#'   Each element corresponds to a point and contains its cluster indices
+#'   (0-based by default).
+#'   Noise points have a single value \code{0}. Overlap points have multiple
+#'   cluster indices.
 #' @examples
 #' \dontrun{
 #' data("attpc", package = "triplclust")
 #' points <- as.matrix(attpc)
-#' clusters <- triplclust(points)
+#' cluster_ids <- triplclust(points)
 #'
-#' cluster_id <- rep(NA_integer_, nrow(points))
-#' for (i in seq_along(clusters)) {
-#'   cluster_id[clusters[[i]]] <- i
-#' }
+#' # Convert to per-point cluster assignment (first cluster if overlap)
+#' cluster_id <- vapply(cluster_ids, function(x) {
+#'   if (length(x) == 1L && x[1] == 0L) NA_integer_ else x[1]
+#' }, integer(1))
+#'
 #' point_colors <- rep("grey70", nrow(points))
 #' assigned <- !is.na(cluster_id)
-#' palette <- grDevices::rainbow(max(1L, length(clusters)))
+#' palette <- grDevices::rainbow(max(1L, length(unique(cluster_id[assigned]))))
 #' point_colors[assigned] <- palette[cluster_id[assigned]]
 #'
 #' rgl::open3d()
@@ -46,6 +50,7 @@ triplclust <- function(points, r = NULL, k = 19L, n = 2L, a = 0.03,
                        s = NULL, t = "auto", dmax = NULL,
                        linkage = "single", m = 5L, verbose = 0L,
                        ordered = FALSE) {
+  # ---------- Validation ----------
   if (!is.matrix(points) | !is.numeric(points) | ncol(points) != 3L) {
     stop("points must be a numeric matrix with exactly three columns",
          call. = FALSE)
@@ -56,7 +61,6 @@ triplclust <- function(points, r = NULL, k = 19L, n = 2L, a = 0.03,
   if (anyNA(points) | any(!is.finite(points))) {
     stop("points must contain only finite values", call. = FALSE)
   }
-  storage.mode(points) <- "double"
 
   r <- .parse_distance(r, "r", 2, default_dnn = TRUE)
   s <- .parse_distance(s, "s", 0.33, default_dnn = TRUE)
@@ -94,12 +98,27 @@ triplclust <- function(points, r = NULL, k = 19L, n = 2L, a = 0.03,
     stop("linkage must be 'single', 'complete', or 'average'", call. = FALSE)
   }
 
-  triplclust_rcpp( # nolint: object_usage_linter
+  # ---------- Modification ----------
+  storage.mode(points) <- "double"
+
+  # Config: index base for output (0 = C++ native, 1 = R-style 1-based)
+  INDEX_BASE <- 0L
+
+  labeled_points <- triplclust_rcpp( # nolint: object_usage_linter
     points, r$value, r$dnn, k, n, a,
     s$value, s$dnn, t, automatic,
     dmax$value, dmax$dnn, dmax$enabled,
     linkage, m, verbose, ordered
   )
+
+  # Apply index base offset
+  # (noise has value 0, overlaps have multiple IDs, all get +INDEX_BASE)
+  if (INDEX_BASE != 0L) {
+    labeled_points <- lapply(labeled_points,
+                             function(cluster_ids) cluster_ids + INDEX_BASE)
+  }
+
+  labeled_points
 }
 
 .parse_distance <- function(value, name, default, default_dnn = FALSE,

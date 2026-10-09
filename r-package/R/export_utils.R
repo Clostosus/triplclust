@@ -1,28 +1,23 @@
 #' Convert cluster assignments to CSV text
 #'
 #' @param points Numeric matrix with exactly three columns (x, y, z).
-#' @param labels Either a list of integer vectors returned by `triplclust()` or
-#'   a per-point integer vector.
+#' @param labels A list of integer vectors from \code{triplclust()} (per-point
+#'   cluster IDs, 0-based, 0 = noise, multiple = overlap).
 #' @return A character string containing CSV-formatted coordinates and labels,
-#'   with zero-based cluster IDs, `-1` for noise, and `-2` for overlaps.
+#'   with 0-based cluster IDs, \code{0} for noise, and semicolon-separated
+#'   IDs for overlaps.
 #' @export
 prepare_csv <- function(points, labels) {
-  if (!is.matrix(points) | !is.numeric(points) | ncol(points) != 3L) {
-    stop(
-      "points must be a numeric matrix with exactly three columns",
-      call. = FALSE
-    )
-  }
-
   export_data <- .prepare_export_data(points, labels)
-  point_labels <- rep("-1", nrow(points))
+  n_points <- nrow(points)
+  point_labels <- rep("0", n_points)
+
   if (length(export_data$point_clusters) > 0L) {
     point_labels[as.integer(names(export_data$point_clusters))] <-
       vapply(export_data$point_clusters, function(cluster_ids) {
-        paste(cluster_ids - 1L, collapse = ";")
+        paste(cluster_ids, collapse = ";")
       }, character(1))
   }
-  point_labels[export_data$overlap_ids] <- "-2"
 
   rows <- paste(formatC(points[, 1], digits = 6, format = "f"),
     formatC(points[, 2], digits = 6, format = "f"),
@@ -32,7 +27,7 @@ prepare_csv <- function(points, labels) {
   )
 
   paste(c(
-    "# Comment: curveID -1 represents noise; -2 represents overlap",
+    "# Comment: curveID 0 represents noise; semicolon-separated IDs for overlaps",
     "# x, y, z, curveID",
     rows
   ), collapse = "\n")
@@ -41,19 +36,11 @@ prepare_csv <- function(points, labels) {
 #' Convert cluster assignments to gnuplot command text
 #'
 #' @param points Numeric matrix with exactly three columns (x, y, z).
-#' @param labels Either a list of integer vectors returned by
-#'   \code{triplclust()} or a per-point integer vector. In a per-point vector,
-#'   `-1` marks noise and `-2` marks overlap.
+#' @param labels A list of integer vectors from \code{triplclust()} (per-point
+#'   cluster IDs, 0-based, 0 = noise, multiple = overlap).
 #' @return A character string containing a gnuplot script.
 #' @export
 prepare_plot <- function(points, labels) {
-  if (!is.matrix(points) | !is.numeric(points) | ncol(points) != 3L) {
-    stop(
-      "points must be a numeric matrix with exactly three columns",
-      call. = FALSE
-    )
-  }
-
   export_data <- .prepare_export_data(points, labels)
   cluster_indices <- export_data$clusters
   overlap_ids <- export_data$overlap_ids
@@ -132,67 +119,50 @@ prepare_plot <- function(points, labels) {
   paste(script, collapse = "\n")
 }
 
-.prepare_plot_labels <- function(points, labels) {
-  if (is.list(labels)) {
-    cluster_list <- lapply(labels, as.integer)
-    if (length(cluster_list) == 0L) {
-      return(list())
-    }
-    bad <- vapply(cluster_list, function(idx) {
-      length(idx) > 0L && any(idx < 1L | idx > nrow(points))
-    }, logical(1))
-    if (any(bad)) {
-      stop("cluster indices are out of range", call. = FALSE)
-    }
-    return(cluster_list)
-  }
-
-  if (is.numeric(labels) | is.integer(labels) | is.character(labels)) {
-    labels <- as.integer(labels)
-    if (length(labels) != nrow(points)) {
-      stop("labels must have one value per point", call. = FALSE)
-    }
-    if (any(is.na(labels))) labels[is.na(labels)] <- 0L
-    return(split(seq_len(nrow(points)), labels))
-  }
-
-  stop("labels must be a list of integer vectors or a per-point label vector",
-       call. = FALSE)
-}
-
 .prepare_export_data <- function(points, labels) {
-  clusters <- .prepare_plot_labels(points, labels)
-  overlap_ids <- noise_ids <- integer(0)
+  n_points <- nrow(points)
 
-  if (!is.list(labels) && any(as.integer(labels) < 0L, na.rm = TRUE)) {
-    point_labels <- as.integer(labels)
-    point_labels[is.na(point_labels)] <- 0L
-    overlap_ids <- which(point_labels == -2L)
-    noise_ids <- which(point_labels == -1L)
-    assigned_ids <- which(point_labels >= 0L)
-    clusters <- split(assigned_ids, point_labels[assigned_ids])
+  cluster_ids_list <- labels
+  noise_ids <- integer(0)
+  overlap_ids <- integer(0)
+  clusters <- list()
+
+  for (i in seq_len(n_points)) {
+    ids <- cluster_ids_list[[i]]
+    if (length(ids) == 1L && ids[1] == 0L) {
+      noise_ids <- c(noise_ids, i)
+    } else {
+      if (length(ids) > 1L) {
+        overlap_ids <- c(overlap_ids, i)
+      }
+      for (cid in ids) {
+        if (cid >= 0L) {
+          cluster_idx <- cid + 1L
+          if (cluster_idx > length(clusters)) {
+            length(clusters) <- cluster_idx
+          }
+          if (is.null(clusters[[cluster_idx]])) {
+            clusters[[cluster_idx]] <- integer(0)
+          }
+          clusters[[cluster_idx]] <- c(clusters[[cluster_idx]], i)
+        }
+      }
+    }
   }
 
+  clusters <- clusters[!vapply(clusters, is.null, logical(1))]
   clusters <- lapply(clusters, unique)
+
   point_clusters <- split(
     rep.int(seq_along(clusters), lengths(clusters)),
     unlist(clusters, use.names = FALSE)
   )
-  memberships <- sapply(point_clusters, length)
-  overlap_ids <- sort(unique(c(
-    overlap_ids,
-    as.integer(names(memberships)[memberships > 1L])
-  )))
-  assigned_ids <- c(as.integer(names(point_clusters)), overlap_ids)
 
   list(
     clusters = clusters,
     point_clusters = point_clusters,
-    overlap_ids = overlap_ids,
-    unassigned_ids = union(
-      noise_ids,
-      setdiff(seq_len(nrow(points)), assigned_ids)
-    )
+    overlap_ids = sort(overlap_ids),
+    unassigned_ids = noise_ids
   )
 }
 
